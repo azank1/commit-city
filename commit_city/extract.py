@@ -70,8 +70,14 @@ def unquote(p):
     return p
 
 
+# Bare clones have no work tree, so git only applies .gitattributes from a tree if told to. Git 2.42-2.43
+# read HEAD's by default in bare repos and later releases stopped; pin it so binary/text detection is the
+# same on every git (and matches the hosted builder).
+GIT_CONFIG = ('-c', 'core.quotePath=false', '-c', 'attr.tree=HEAD')
+
+
 def git(repo_dir, *args, stdin=None, env=None):
-    r = subprocess.run(['git', '-C', repo_dir, '-c', 'core.quotePath=false', *args], input=stdin,
+    r = subprocess.run(['git', '-C', repo_dir, *GIT_CONFIG, *args], input=stdin,
                        capture_output=True, text=True, errors='replace', env=env)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip()[:400])
