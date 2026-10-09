@@ -1,8 +1,8 @@
 // Sign in with GitHub. No scopes: the token can only read public data, and builds then use the
 // visitor's own API quota instead of the site's.
 import { randomBytes } from 'node:crypto';
-import { handle, HttpError, SITE } from '../../lib/http.js';
-import { oauthCookie, safeNext } from '../../lib/session.js';
+import { handle, HttpError, SITE } from '../http.js';
+import { oauthCookie, safeNext } from '../session.js';
 
 export const GET = handle(async req => {
   const id = process.env.GITHUB_CLIENT_ID;

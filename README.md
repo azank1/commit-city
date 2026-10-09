@@ -77,7 +77,7 @@ Every city also gets a link preview, so pasting `commit.city/you` into Slack, X,
 - **Public data only.** The hosted builder reads public repos with a read-only token that cannot see anything private. Private repos never appear on commit.city.
 - **You can opt out.**
   - Sign in with GitHub to exclude repos from your city or to hide it completely. Hiding deletes it and keeps it from being rebuilt.
-  - Sign-in asks for no scopes; it only proves who you are.
+  - Sign-in asks for no scopes. It proves who you are, and builds you start then use your own GitHub API quota instead of the shared one.
 - **No ads, no trackers.** No cookies are set unless you sign in. A city is a cached public file built from public commits, nothing more.
 
 ## Private repos? Run it yourself

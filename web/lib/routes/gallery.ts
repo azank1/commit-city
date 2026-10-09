@@ -1,7 +1,7 @@
 // Cities for the landing page: a hand-picked few, and the most recently built.
-import { GALLERY, type GalleryEntry, readMeta } from '../lib/city.js';
-import { handle, json } from '../lib/http.js';
-import { getJSON } from '../lib/store.js';
+import { GALLERY, type GalleryEntry, readMeta } from '../city.js';
+import { handle, json } from '../http.js';
+import { getJSON } from '../store.js';
 
 const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'facebook/react', 'denoland/deno', 'gaearon', 'tj', 'rust-lang/rust', 'withastro', 'antfu'];
 

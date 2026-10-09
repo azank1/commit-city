@@ -23,6 +23,21 @@ export function handle(fn: (req: Request) => Promise<Response>) {
   };
 }
 
+type Handler = (req: Request) => Promise<Response>;
+
+/**
+ * Several small endpoints in one function (the Hobby plan allows 12 per deployment): vercel.json rewrites
+ * each public path to the function with ?op=<name>.
+ */
+export function dispatch(routes: Record<string, { GET?: Handler; POST?: Handler }>, method: 'GET' | 'POST'): Handler {
+  return async req => {
+    const op = new URL(req.url).searchParams.get('op') ?? '';
+    if (!Object.hasOwn(routes, op)) return json({ error: 'not found' }, 404);
+    const h = routes[op][method];
+    return h ? h(req) : json({ error: 'method not allowed' }, 405);
+  };
+}
+
 export async function body<T>(req: Request, max = 512_000): Promise<T> {
   const text = await req.text();
   if (text.length > max) throw new HttpError(413, 'request too large');

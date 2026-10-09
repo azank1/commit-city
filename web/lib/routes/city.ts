@@ -1,7 +1,7 @@
 // Status of a city: ready (with its payload URL), missing, or hidden.
-import { readMeta, readSettings } from '../lib/city.js';
-import { handle, json } from '../lib/http.js';
-import { cityKey, parseTarget, wantsWhole } from '../lib/target.js';
+import { readMeta, readSettings } from '../city.js';
+import { handle, json } from '../http.js';
+import { cityKey, parseTarget, wantsWhole } from '../target.js';
 
 export const GET = handle(async req => {
   const u = new URL(req.url);

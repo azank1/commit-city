@@ -1,5 +1,5 @@
 // The project's star count for the page chrome, cached at the edge so visitors never hit GitHub.
-import { handle, json } from '../lib/http.js';
+import { handle, json } from '../http.js';
 
 export const GET = handle(async () => {
   const token = process.env.GITHUB_TOKEN;

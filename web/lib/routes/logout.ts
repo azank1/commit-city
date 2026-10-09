@@ -1,5 +1,5 @@
-import { handle } from '../../lib/http.js';
-import { sessionCookie, userCookie } from '../../lib/session.js';
+import { handle } from '../http.js';
+import { sessionCookie, userCookie } from '../session.js';
 
 export const POST = handle(async () => {
   const h = new Headers({ 'Cache-Control': 'no-store' });

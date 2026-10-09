@@ -1,6 +1,6 @@
 // GitHub sends the visitor back here with a code: trade it for a token, seal it into the session cookie.
-import { handle, SITE } from '../../lib/http.js';
-import { cookies, oauthCookie, safeNext, sealSession, sessionCookie, userCookie } from '../../lib/session.js';
+import { handle, SITE } from '../http.js';
+import { cookies, oauthCookie, safeNext, sealSession, sessionCookie, userCookie } from '../session.js';
 
 const back = (to: string, cookieList: string[]) => {
   const h = new Headers({ Location: to, 'Cache-Control': 'no-store' });

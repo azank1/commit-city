@@ -1,7 +1,7 @@
 // An owner's choices about their own cities: repos to leave out, or hide everything.
-import { readSettings, writeSettings } from '../lib/city.js';
-import { body, handle, HttpError, json } from '../lib/http.js';
-import { sessionOf } from '../lib/session.js';
+import { readSettings, writeSettings } from '../city.js';
+import { body, handle, HttpError, json } from '../http.js';
+import { sessionOf } from '../session.js';
 
 const REPO = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/;
 
