@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>commit city</title>
+<style>
+:root {
+  color-scheme: dark;
+  --ink: #e8eef7;
+  --ink-2: #b4c0d3;
+  --muted: #7f8ca2;
+  --accent: #5fd3f3;
+  --panel: rgba(8, 12, 21, 0.64);
+  --line: rgba(255, 255, 255, 0.08);
+  --hot: #8ff0ff;
+  --active: #4fb4e6;
+  --cooling: #5f7fa6;
+  --dormant: #4a5468;
+  --abandoned: #313847;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: #04060c; color: var(--ink); overflow: hidden; }
+body { font-size: 13px; -webkit-font-smoothing: antialiased; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; outline: none; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+.panel {
+  position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+#hud { position: fixed; inset: 0; pointer-events: none; padding: max(14px, env(safe-area-inset-top, 0px)) 16px max(14px, env(safe-area-inset-bottom, 0px)); }
+#hud > * { pointer-events: auto; }
+body.bare #hud > *:not(#unbare) { display: none; }
+#unbare { display: none; position: absolute; right: 16px; top: 14px; }
+body.bare #unbare { display: inline-flex; }
+
+/* clock + counters */
+#clock { left: 16px; top: max(14px, env(safe-area-inset-top, 0px)); width: 318px; padding: 14px 16px 12px; }
+.kicker { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.kicker b { color: var(--accent); font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
+#clock-date { font-size: 24px; font-weight: 650; margin-top: 6px; letter-spacing: -0.01em; }
+.clockline { display: flex; gap: 8px; align-items: baseline; color: var(--ink-2); margin-top: 2px; }
+#clock-time { font-variant-numeric: tabular-nums; font-size: 16px; color: var(--ink); font-weight: 600; }
+.tz { color: var(--muted); font-size: 11px; }
+#clock-phase { margin-left: auto; color: var(--muted); font-size: 12px; }
+.counters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.counters div { display: flex; flex-direction: column; min-width: 0; }
+.counters span { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.counters label { color: var(--muted); font-size: 10.5px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.counters .big { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 10px; }
+.counters .big span { font-size: 40px; letter-spacing: -0.02em; line-height: 1; }
+.counters .big label { font-size: 12px; }
+.ticker-wrap { margin-top: 12px; }
+#ticker { width: 100%; height: 38px; display: block; }
+#contrib-note { color: var(--muted); font-size: 10.5px; line-height: 1.4; margin-top: 8px; max-width: 290px; }
+.tick-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; margin-top: 3px; }
+
+/* right column */
+#side { right: 16px; top: max(14px, env(safe-area-inset-top, 0px)); width: 300px; max-height: calc(100vh - 230px); display: flex; flex-direction: column; padding: 12px 8px 8px 12px; }
+.side-head { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; display: flex; justify-content: space-between; padding-right: 6px; }
+#board { display: flex; flex-direction: column; overflow-y: auto; margin-top: 8px; padding-right: 4px; scrollbar-width: thin; }
+.row { display: grid; grid-template-columns: 10px 1fr auto; grid-template-rows: auto 3px; gap: 2px 8px; align-items: center; text-align: left; padding: 6px 6px 7px; border-radius: 8px; }
+.row:hover { background: rgba(255, 255, 255, 0.05); }
+.row.sel { background: rgba(95, 211, 243, 0.12); }
+.row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dormant); }
+.rn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.rn small { color: var(--muted); font-weight: 400; }
+.rc { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.row .bar { grid-column: 2 / 4; height: 3px; background: rgba(255, 255, 255, 0.06); border-radius: 2px; overflow: hidden; }
+.row .bar span { display: block; height: 100%; background: #3d8fd6; border-radius: 2px; }
+[data-status="hot"] { --st: var(--hot); }
+[data-status="active"] { --st: var(--active); }
+[data-status="cooling"] { --st: var(--cooling); }
+[data-status="dormant"] { --st: var(--dormant); }
+[data-status="abandoned"] { --st: var(--abandoned); }
+.row .dot[data-status] { background: var(--st); }
+.row .dot[data-status="hot"] { box-shadow: 0 0 8px var(--hot); }
+.row .dot[data-status="abandoned"] { background: transparent; box-shadow: inset 0 0 0 1.5px #59647a; }
+
+/* focus card */
+#focus { right: 16px; top: max(14px, env(safe-area-inset-top, 0px)); width: 300px; padding: 14px 16px; z-index: 2; }
+#focus[hidden] { display: none; }
+.f-head { display: flex; align-items: flex-start; gap: 10px; }
+.f-head > div { min-width: 0; flex: 1; }
+#f-owner { color: var(--muted); font-size: 11.5px; }
+#f-name { font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
+#f-close { color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 4px; }
+#f-close:hover { color: var(--ink); }
+#f-status { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; color: var(--ink-2); padding: 2px 8px 2px 6px; border: 1px solid var(--line); border-radius: 99px; }
+#f-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--st, var(--dormant)); }
+.f-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 10px; }
+.f-grid div { display: flex; flex-direction: column; }
+.f-grid span { font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.f-grid label { color: var(--muted); font-size: 10.5px; }
+.f-sub { color: var(--muted); font-size: 11px; margin-top: 10px; display: flex; justify-content: space-between; }
+#f-last { color: var(--ink-2); font-size: 12px; }
+#f-mix { display: flex; height: 8px; gap: 2px; margin-top: 6px; border-radius: 4px; overflow: hidden; }
+#f-mix span { display: block; height: 100%; min-width: 2px; }
+#f-tops { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+#f-tops li { display: grid; grid-template-columns: 1fr auto; position: relative; font-size: 12px; padding-bottom: 3px; }
+#f-tops .dn { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#f-tops .dv { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+#f-tops i { position: absolute; left: 0; bottom: 0; height: 2px; background: rgba(95, 211, 243, 0.45); border-radius: 1px; }
+body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
+
+/* bottom */
+#transport { left: 16px; right: 16px; bottom: max(14px, env(safe-area-inset-bottom, 0px)); padding: 10px 12px; display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; }
+.ctl { display: flex; align-items: center; gap: 4px; }
+.ctl button { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 13px; color: var(--ink-2); }
+.ctl button:hover { background: rgba(255, 255, 255, 0.07); color: var(--ink); }
+#btn-play { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: #04121a; font-size: 14px; font-weight: 700; }
+#btn-play:hover { background: #8fe6fb; color: #04121a; }
+.segs { display: flex; background: rgba(255, 255, 255, 0.05); border-radius: 9px; padding: 2px; }
+.seg { padding: 6px 9px; border-radius: 7px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.seg:hover { color: var(--ink); }
+.seg.on { background: rgba(95, 211, 243, 0.18); color: var(--ink); }
+#timeline { width: 100%; height: 54px; display: block; cursor: ew-resize; touch-action: none; }
+.tools { display: flex; gap: 4px; }
+.tools button { padding: 7px 9px; border-radius: 8px; color: var(--muted); font-size: 12px; border: 1px solid transparent; }
+.tools button:hover { color: var(--ink); background: rgba(255, 255, 255, 0.06); }
+.tools button.on { color: var(--ink); border-color: rgba(95, 211, 243, 0.35); }
+#legend { position: absolute; left: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 86px); display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: min(560px, calc(100vw - 360px)); color: var(--ink-2); font-size: 11.5px; pointer-events: none; text-shadow: 0 1px 6px #000; }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+#legend .lg-title { color: var(--muted); width: 100%; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+#help { position: absolute; right: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 86px); color: var(--muted); font-size: 11px; text-align: right; max-width: 420px; pointer-events: none; text-shadow: 0 1px 6px #000; }
+#toasts { position: absolute; left: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 140px); display: flex; flex-direction: column-reverse; gap: 6px; pointer-events: none; }
+.toast { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 11px; font-size: 12px; backdrop-filter: blur(10px); animation: tin 0.35s ease-out; transition: opacity 0.5s, transform 0.5s; display: flex; gap: 8px; align-items: baseline; }
+.toast small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.toast.new { border-color: rgba(95, 211, 243, 0.35); }
+.toast.record { border-color: rgba(255, 210, 120, 0.4); }
+.toast.quiet { color: var(--ink-2); }
+.toast.out { opacity: 0; transform: translateY(6px); }
+@keyframes tin { from { opacity: 0; transform: translateY(8px); } }
+
+/* 3D labels */
+.repo-label { pointer-events: auto; cursor: pointer; display: flex; align-items: baseline; gap: 5px; padding: 3px 8px 3px 7px; border-radius: 99px; background: rgba(6, 10, 18, 0.66); border: 1px solid rgba(255, 255, 255, 0.09); font-size: 11.5px; white-space: nowrap; transition: opacity 0.4s, border-color 0.4s; transform-origin: 50% 100%; }
+.repo-label .ow { color: var(--muted); font-size: 10px; }
+.repo-label .nm { font-weight: 600; }
+.repo-label .ct { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+.repo-label[data-status="hot"] { border-color: rgba(143, 240, 255, 0.55); }
+.repo-label[data-status="abandoned"] .ct, .repo-label[data-status="dormant"] .ct { color: var(--muted); }
+.repo-label.bump .ct { animation: bump 0.45s ease-out; }
+@keyframes bump { 30% { color: #fff; text-shadow: 0 0 10px var(--accent); } }
+.me-label { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #dff7ff; text-shadow: 0 0 12px rgba(95, 211, 243, 0.9); pointer-events: none; }
+.dir-label { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #d7e6f7; background: rgba(6, 10, 18, 0.55); padding: 1px 6px; border-radius: 5px; border-left: 2px solid var(--accent); pointer-events: none; white-space: nowrap; }
+.sector-label { color: rgba(170, 195, 230, 0.55); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
+
+#tip { position: fixed; z-index: 10; pointer-events: none; max-width: 380px; background: rgba(6, 10, 18, 0.92); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; font-size: 12px; color: var(--ink-2); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45); }
+#tip b { display: block; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; font-weight: 600; overflow-wrap: anywhere; margin-bottom: 2px; }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #04060c; color: var(--muted); font-size: 13px; letter-spacing: 0.08em; transition: opacity 0.8s; z-index: 20; }
+#loading.done { opacity: 0; pointer-events: none; }
+
+@media (max-width: 900px) {
+  #clock { width: auto; right: 16px; padding: 10px 12px; }
+  #clock-date { font-size: 18px; }
+  .counters { grid-template-columns: repeat(4, 1fr); }
+  .counters .big span { font-size: 28px; }
+  .ticker-wrap, #side, #help, #legend { display: none; }
+  #focus { top: auto; bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 196px); left: 16px; width: auto; }
+  #toasts { bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 196px); right: 16px; }
+  #transport { grid-template-columns: auto 1fr; }
+  #transport .segs { grid-column: 2; justify-self: end; }
+  #timeline { grid-column: 1 / -1; }
+  .tools { grid-column: 1 / -1; justify-content: space-between; }
+}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="hud">
+  <section id="clock" class="panel" aria-label="Simulation clock">
+    <div class="kicker"><span id="kicker-title">commit city</span><b id="speed-label"></b></div>
+    <div id="clock-date">–</div>
+    <div class="clockline"><span id="clock-time">–</span><span class="tz" id="clock-tz"></span><span id="clock-phase"></span></div>
+    <div class="counters">
+      <div class="big"><span id="c-total">0</span><label>commits so far</label></div>
+      <div><span id="c-today">0</span><label>today</label></div>
+      <div><span id="c-hour">0</span><label>this hour</label></div>
+      <div><span id="c-active">0</span><label>repos active · 7d</label></div>
+      <div><span id="c-conn">0</span><label>repos connected</label></div>
+      <div><span id="c-files">0</span><label>files standing</label></div>
+      <div><span id="c-lines">0</span><label>lines standing</label></div>
+    </div>
+    <div id="contrib-note"></div>
+    <div class="ticker-wrap">
+      <canvas id="ticker" aria-label="Your commits per hour over the last 48 simulated hours"></canvas>
+      <div class="tick-labels"><span>−48 h</span><span>your commits per hour</span><span>now</span></div>
+    </div>
+  </section>
+
+  <section id="focus" class="panel" hidden aria-label="Repository details">
+    <div class="f-head">
+      <div><div id="f-owner"></div><div id="f-name"></div><span id="f-status"></span></div>
+      <button id="f-close" aria-label="Close">×</button>
+    </div>
+    <div class="f-grid">
+      <div><span id="f-commits">0</span><label>your commits</label></div>
+      <div><span id="f-files">0</span><label>files</label></div>
+      <div><span id="f-lines">0</span><label>lines</label></div>
+      <div><span id="f-dirs">0</span><label>directories</label></div>
+      <div><span id="f-depth">0</span><label>max depth</label></div>
+      <div><span id="f-fp">0</span><label>changes landed</label></div>
+    </div>
+    <div id="f-last"></div>
+    <div class="f-sub"><span>language mix (lines)</span><span id="f-share"></span></div>
+    <div id="f-mix"></div>
+    <div class="f-sub"><span>top-level architecture</span><span>files</span></div>
+    <ul id="f-tops"></ul>
+  </section>
+
+  <section id="side" class="panel" aria-label="Repositories">
+    <div class="side-head"><span>repos · your commits so far</span><span>status</span></div>
+    <div id="board"></div>
+  </section>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="legend"><span class="lg-title">building colour = file type · height = lines · platforms = directories</span></div>
+  <div id="help">drag orbit · right-drag pan · scroll zoom · click a repo to inspect<br>space play/pause · ←/→ ±1 day · shift ±1 hour · 1–6 speed · O orbit · L labels · H hide UI</div>
+
+  <section id="transport" class="panel" aria-label="Playback">
+    <div class="ctl">
+      <button id="btn-back" aria-label="Back one day" title="Back one day (←)">◀◀</button>
+      <button id="btn-play" aria-label="Pause" title="Play / pause (space)">❚❚</button>
+      <button id="btn-fwd" aria-label="Forward one day" title="Forward one day (→)">▶▶</button>
+    </div>
+    <div id="speeds" class="segs" role="group" aria-label="Speed"></div>
+    <canvas id="timeline" aria-label="Timeline of your daily commits; drag to scrub"></canvas>
+    <div class="tools">
+      <button id="btn-orbit" title="Auto-orbit (O)">orbit</button>
+      <button id="btn-labels" title="Labels (L)">labels</button>
+      <button id="btn-home" title="Back to overview (Esc)">overview</button>
+      <button id="btn-quality" class="on" title="Bloom + hi-dpi">HQ</button>
+      <button id="btn-hud" title="Hide UI (H)">hide UI</button>
+    </div>
+  </section>
+  <button id="unbare" class="panel" style="position:absolute;padding:8px 12px;border-radius:10px" onclick="document.body.classList.remove('bare')">show UI</button>
+</div>
+<div id="tip" hidden></div>
+<div id="loading">assembling your repos…</div>
+<img id="avatar-src" hidden alt="" src="__AVATAR__">
+<script id="lapse-data" type="application/json">__DATA__</script>
+<script>/*__APP__*/</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.commit-city-cache/
+_site/
+commit-city.html
+viewer/node_modules/
+.test-out/
+web/node_modules/
+.local-store/
+web/.dev-out/
+web/.vercel/

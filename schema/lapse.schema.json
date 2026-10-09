@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/azank1/commit-city/schema/lapse.schema.json",
+  "title": "commit-city payload, schema 1",
+  "description": "Everything the viewer draws. Times are integer minutes since `epoch` (local midnight). A file's size is its line count; 0 means the file does not exist at that moment.",
+  "type": "object",
+  "required": ["schema", "user", "tz", "epoch", "t_end", "langs", "repos"],
+  "properties": {
+    "schema": { "const": 1 },
+    "generator": { "type": "string" },
+    "generated": { "type": "string", "format": "date-time" },
+    "kind": {
+      "enum": ["user", "org", "repo"],
+      "description": "Whose commits the city shows. Absent means a person (the CLI and Action). Orgs and repos show everyone's commits."
+    },
+    "title": { "type": "string" },
+    "user": {
+      "type": "object",
+      "required": ["login"],
+      "properties": {
+        "login": { "type": "string" },
+        "name": { "type": "string" },
+        "avatar": { "type": "string", "description": "source URL; the page embeds the image itself" },
+        "url": { "type": "string" }
+      }
+    },
+    "tz": {
+      "type": "object",
+      "required": ["offset", "label"],
+      "properties": {
+        "offset": { "type": "integer", "description": "minutes east of UTC; the clock and day boundaries use it" },
+        "label": { "type": "string" },
+        "iana": { "type": "string" }
+      }
+    },
+    "epoch": { "type": "integer", "description": "unix seconds at t = 0" },
+    "t_end": { "type": "integer", "minimum": 1, "description": "last minute of the lapse (build time)" },
+    "langs": { "type": "array", "items": { "type": "string" }, "maxItems": 9, "description": "language classes in palette order; files reference them by index" },
+    "totals": {
+      "type": "object",
+      "properties": {
+        "commits": { "type": "integer" },
+        "contributions": { "type": ["integer", "null"], "description": "GitHub calendar total over the window (includes PRs, issues, reviews, private)" },
+        "restricted": { "type": "integer" },
+        "window_start": { "type": "string" },
+        "omitted_repos": { "type": "integer" },
+        "omitted_commits": { "type": "integer" }
+      }
+    },
+    "repos": {
+      "type": "array",
+      "description": "one island per repo, most of your commits first",
+      "items": {
+        "type": "object",
+        "required": ["n", "p", "l", "e", "m"],
+        "properties": {
+          "n": { "type": "string", "pattern": "^[^/]+/[^/]+$", "description": "owner/name (anonymised repos: private/repo-k)" },
+          "fork": { "type": "boolean" },
+          "anon": { "type": "boolean" },
+          "fp": { "type": "integer", "description": "first-parent commits replayed on the default branch" },
+          "agg": { "type": "integer", "description": "paths folded into aggregate buildings" },
+          "p": { "type": "array", "items": { "type": "string" }, "description": "file paths; an aggregate ends in '/…'" },
+          "l": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 8 } },
+          "e": {
+            "type": "array",
+            "description": "per file: flat [t0, size0, t1, size1, ...], t ascending",
+            "items": { "type": "array", "items": { "type": "integer" } }
+          },
+          "m": {
+            "type": "array",
+            "description": "your commits: [t (author time), files touched, [file indexes]]",
+            "items": {
+              "type": "array",
+              "prefixItems": [{ "type": "integer" }, { "type": "integer" }, { "type": "array", "items": { "type": "integer" } }],
+              "items": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

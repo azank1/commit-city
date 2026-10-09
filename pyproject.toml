@@ -1,0 +1,25 @@
+[project]
+name = "commit-city"
+version = "0.2.0"
+description = "Your GitHub year as a 3D code-city time-lapse (the offline builder behind commit.city)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = []
+
+[project.urls]
+Homepage = "https://commit.city"
+Source = "https://github.com/azank1/commit-city"
+
+[project.scripts]
+commit-city = "commit_city.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["commit_city"]
+
+[tool.setuptools.package-data]
+commit_city = ["viewer.html"]

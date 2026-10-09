@@ -1,0 +1,25 @@
+{
+  "name": "commit-city-web",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "commit.city: the hosted builder and site",
+  "scripts": {
+    "test": "node scripts/run-tests.mjs",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "@vercel/blob": "2.8.0",
+    "@vercel/functions": "3.9.9"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "path-to-regexp": "6.3.0",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,30 @@
+# Copy to commit-city.toml (repo root) to change the defaults. Every key is optional.
+
+# login = "octocat"              # default: the repository owner / token owner
+since = "365d"                   # "365d", "2025-01-01", or "account" (everything since you joined)
+# timezone = "Europe/Berlin"     # default: detected from the UTC offsets on your own commits
+# title = "octocat builds"
+
+include_private = false          # true needs a token that can read them; they are always anonymised
+include_forks = true             # forks you committed to
+anonymize = []                   # public repos to anonymise anyway, e.g. ["my-org/*"]
+
+[repos]
+include = []                     # extra repos to consider, "owner/name"
+exclude = []                     # "owner/name" or patterns like "octocat/old-*"
+
+[limits]
+max_repos = 60                   # most-committed repos first
+max_files_per_repo = 2500        # bigger repos collapse deep folders into single buildings
+max_files_total = 60000          # whole-city budget, shared evenly
+max_clone_mb = 1500              # skip repos larger than this
+clone_timeout = 1800             # seconds per clone
+
+[paths]
+# exclude_dirs = ["node_modules", "dist", "vendor"]       # replaces the default list
+# exclude_files = ["*.min.js", "package-lock.json"]
+
+[languages]
+# extension -> one of: "TS / JS", "Python", "Docs", "SQL / data model", "Markup / styles",
+#                      "Config / data", "Shell / infra", "Other code", "Other files"
+# sol = "Other code"

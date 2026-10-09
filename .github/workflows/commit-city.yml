@@ -1,0 +1,44 @@
+# Builds your commit city and publishes it to GitHub Pages: https://<you>.github.io/<this-repo>/
+# One-time setup: Settings -> Pages -> Source: "GitHub Actions". Then Actions -> commit-city -> Run workflow.
+# (Just want a link? https://commit.city/<you> builds the public city with no setup at all.)
+name: commit-city
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'          # every Monday; only repos with new commits are re-cloned
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: commit-city
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository != 'azank1/commit-city'   # the upstream's live demo is commit.city itself
+    runs-on: ubuntu-latest
+    timeout-minutes: 350           # big accounts can take a few hours on a cold cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./                   # or, without the template's files: azank1/commit-city@v0
+        with:
+          # for private repos (anonymised), add a PAT secret named COMMIT_CITY_TOKEN and set
+          # include_private = true in commit-city.toml
+          token: ${{ secrets.COMMIT_CITY_TOKEN || github.token }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - id: pages
+        uses: actions/deploy-pages@v4

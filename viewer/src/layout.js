@@ -1,0 +1,169 @@
+// Stable layouts: each repo is a squarified-treemap "code city" built from the union of every
+// path it ever held, so a file keeps its plot for the whole lapse and the city grows into its
+// final shape instead of reshuffling. Islands are then packed into org sectors around the centre.
+
+export function squarify(vals, x, y, w, h) {
+  // vals sorted descending; returns [x, y, w, h] per value, same order
+  const n = vals.length, out = new Array(n);
+  if (!n) return out;
+  let total = 0;
+  for (const v of vals) total += v;
+  const scale = (w * h) / total;
+  const areas = vals.map(v => v * scale);
+  let i = 0, rx = x, ry = y, rw = w, rh = h;
+  while (i < n) {
+    const side = Math.max(1e-9, Math.min(rw, rh));
+    let j = i, sum = 0, best = Infinity;
+    while (j < n) {
+      const s2 = sum + areas[j];
+      const worst = Math.max((side * side * areas[i]) / (s2 * s2), (s2 * s2) / (side * side * areas[j]));
+      if (worst > best) break;
+      best = worst; sum = s2; j++;
+    }
+    if (rw >= rh) {
+      const sw = sum / Math.max(1e-9, rh);
+      let cy = ry;
+      for (let k = i; k < j; k++) { const ih = areas[k] / sw; out[k] = [rx, cy, sw, ih]; cy += ih; }
+      rx += sw; rw -= sw;
+    } else {
+      const sh = sum / Math.max(1e-9, rw);
+      let cx = rx;
+      for (let k = i; k < j; k++) { const iw = areas[k] / sh; out[k] = [cx, ry, iw, sh]; cx += iw; }
+      ry += sh; rh -= sh;
+    }
+    i = j;
+  }
+  return out;
+}
+
+export const STEP_H = 0.13;       // height of one directory level
+export const BASE_H = 0.7;        // island slab thickness
+
+export function fileWeight(maxSize) {
+  return 1 + 0.55 * Math.log2(1 + maxSize);
+}
+
+export function layoutRepo(paths, maxSize) {
+  const nF = paths.length;
+  const dirs = [];
+  const mk = (name, parent, depth) => {
+    const d = { id: dirs.length, name, parent, depth, dirs: [], files: [], kids: new Map(), w: 0, rect: null,
+                path: parent && parent.path ? parent.path + '/' + name : name };
+    dirs.push(d);
+    return d;
+  };
+  const root = mk('', null, 0);
+  const fileDir = new Int32Array(nF);
+  for (let i = 0; i < nF; i++) {
+    const parts = paths[i].split('/');
+    let node = root;
+    for (let k = 0; k < parts.length - 1; k++) {
+      let c = node.kids.get(parts[k]);
+      if (!c) { c = mk(parts[k], node, node.depth + 1); node.kids.set(parts[k], c); node.dirs.push(c); }
+      node = c;
+    }
+    node.files.push(i);
+    fileDir[i] = node.id;
+  }
+  const fw = new Float32Array(nF);
+  for (let i = 0; i < nF; i++) fw[i] = fileWeight(maxSize[i]);
+  const weigh = d => {
+    let s = 0;
+    for (const c of d.dirs) s += weigh(c);
+    for (const f of d.files) s += fw[f];
+    d.w = s * 1.07 + 0.8;
+    return d.w;
+  };
+  const W = weigh(root);
+  const L = Math.max(2.6, 0.27 * Math.sqrt(W));
+  const fileRect = new Float32Array(nF * 4);   // centre x, centre z, width, depth (island-local)
+  const layoutDir = (d, x, y, w, h) => {
+    d.rect = [x, y, w, h];
+    const m = Math.min(w, h);
+    const pad = d.depth === 0 ? Math.min(0.45, 0.05 * m) : Math.min(0.2, 0.075 * m);
+    const ix = x + pad, iy = y + pad, iw = Math.max(1e-3, w - 2 * pad), ih = Math.max(1e-3, h - 2 * pad);
+    const items = [];
+    for (const c of d.dirs) items.push({ v: c.w, dir: c });
+    for (const f of d.files) items.push({ v: fw[f], file: f });
+    items.sort((a, b) => b.v - a.v);
+    const rects = squarify(items.map(t => t.v), ix, iy, iw, ih);
+    items.forEach((it, k) => {
+      const [rx, ry, rw, rh] = rects[k];
+      if (it.dir) { layoutDir(it.dir, rx, ry, rw, rh); return; }
+      const g = Math.min(0.13, 0.17 * Math.min(rw, rh));
+      const o = it.file * 4;
+      fileRect[o] = rx + rw / 2; fileRect[o + 1] = ry + rh / 2;
+      fileRect[o + 2] = Math.max(0.02, rw - 2 * g); fileRect[o + 3] = Math.max(0.02, rh - 2 * g);
+    });
+  };
+  layoutDir(root, -L / 2, -L / 2, L, L);
+  let maxDepth = 0;
+  for (const d of dirs) maxDepth = Math.max(maxDepth, d.depth);
+  return { L, dirs, fileDir, fileRect, maxDepth };
+}
+
+export function heightOf(size) {
+  return size <= 0 ? 0 : Math.min(12, 0.16 + 0.085 * Math.sqrt(size));
+}
+
+// Pack islands into angular sectors, one per org (single-repo orgs share an "elsewhere" sector).
+export function placeIslands(items) {
+  // items: {key, org, R, weight}; returns Map key -> {x, z} and sector list
+  const byOrg = new Map();
+  for (const it of items) {
+    if (!byOrg.has(it.org)) byOrg.set(it.org, []);
+    byOrg.get(it.org).push(it);
+  }
+  const sectors = [];
+  const other = { name: 'elsewhere', items: [] };
+  for (const [org, list] of byOrg) {
+    const w = list.reduce((a, b) => a + b.weight, 0);
+    if (list.length >= 2 || w >= 100) sectors.push({ name: org, items: list, w });
+    else other.items.push(...list);
+  }
+  sectors.sort((a, b) => b.w - a.w);
+  if (other.items.length) sectors.push({ ...other, w: other.items.reduce((a, b) => a + b.weight, 0) });
+  // angular share ~ total island radius in the sector (what it needs along the ring), floor 0.42 rad
+  const need = sectors.map(s => Math.max(0.42, s.items.reduce((a, b) => a + b.R, 0)));
+  const tot = need.reduce((a, b) => a + b, 0);
+  let a = -Math.PI / 2 - (need[0] / tot) * Math.PI;      // first sector centred towards the viewer
+  const placed = [];
+  const pos = new Map();
+  for (let si = 0; si < sectors.length; si++) {
+    const s = sectors[si];
+    const span = (need[si] / tot) * Math.PI * 2;
+    s.a0 = a; s.a1 = a + span; s.mid = a + span / 2;
+    a += span;
+    s.items.sort((p, q) => q.weight - p.weight || q.R - p.R);
+    let outer = 0;
+    for (const it of s.items) {
+      let done = false;
+      for (let r = 11 + it.R; !done && r < 2000; r += 0.5) {
+        const margin = Math.min(span / 2 - 0.01, Math.asin(Math.min(1, it.R / r)) * 0.55);
+        const lo = s.a0 + margin, hi = s.a1 - margin;
+        if (hi < lo) continue;
+        const steps = Math.max(2, Math.ceil(((hi - lo) * r) / 1.2));
+        const cand = [];
+        for (let k = 0; k <= steps; k++) cand.push(lo + ((hi - lo) * k) / steps);
+        cand.sort((p, q) => Math.abs(p - s.mid) - Math.abs(q - s.mid));
+        for (const ang of cand) {
+          const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
+          let ok = true;
+          for (const p of placed) {
+            const dx = p.x - x, dz = p.z - z, min = p.R + it.R + 2.2;
+            if (dx * dx + dz * dz < min * min) { ok = false; break; }
+          }
+          if (ok) {
+            placed.push({ x, z, R: it.R });
+            pos.set(it.key, { x, z });
+            outer = Math.max(outer, r + it.R);
+            done = true;
+            break;
+          }
+        }
+      }
+    }
+    s.outer = outer;
+  }
+  return { pos, sectors };
+}

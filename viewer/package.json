@@ -1,0 +1,8 @@
+{
+  "name": "commit-city-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "esbuild": "0.20.2", "three": "0.160.1" }
+}

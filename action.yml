@@ -1,0 +1,52 @@
+name: commit-city
+description: Replay your GitHub year as a 3D code-city time-lapse (one offline HTML page).
+author: azank1
+branding:
+  icon: box
+  color: blue
+
+inputs:
+  login:
+    description: GitHub user to draw (default: the repository owner)
+    default: ${{ github.repository_owner }}
+  token:
+    description: >
+      Token for the GitHub API. The default GITHUB_TOKEN reads public data. For private repos
+      (opt-in, always anonymised) pass a fine-grained PAT with read-only Contents + Metadata.
+    default: ${{ github.token }}
+  config:
+    description: Path to commit-city.toml (optional)
+    default: commit-city.toml
+  out:
+    description: Output HTML path
+    default: _site/index.html
+  cache:
+    description: Cache directory (kept between runs so only changed repos are re-cloned)
+    default: .commit-city-cache
+
+outputs:
+  html:
+    description: Path of the generated page
+    value: ${{ inputs.out }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: actions/cache@v4
+      with:
+        path: ${{ inputs.cache }}
+        key: commit-city-${{ inputs.login }}-${{ github.run_id }}
+        restore-keys: commit-city-${{ inputs.login }}-
+    - shell: bash
+      env:
+        COMMIT_CITY_TOKEN: ${{ inputs.token }}
+        PYTHONPATH: ${{ github.action_path }}
+      run: |
+        python -m commit_city build \
+          --login "${{ inputs.login }}" \
+          --config "${{ inputs.config }}" \
+          --out "${{ inputs.out }}" \
+          --cache "${{ inputs.cache }}"

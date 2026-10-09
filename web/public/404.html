@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found · commit.city</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root { color-scheme: dark; font-family: Inter, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(900px 500px at 50% 110%, rgba(44, 143, 214, 0.25), transparent 60%), #04060c; color: #e8eef7; padding: 24px; text-align: center; }
+h1 { font-size: 64px; margin: 0; letter-spacing: -0.04em; }
+p { color: #b4c0d3; }
+form { display: flex; gap: 8px; justify-content: center; margin-top: 18px; }
+input { width: min(320px, 60vw); background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; color: #e8eef7; padding: 10px 12px; font: 14px ui-monospace, Menlo, monospace; outline: 0; }
+button { background: #5fd3f3; color: #04121a; border: 0; border-radius: 10px; padding: 0 16px; font-weight: 700; cursor: pointer; }
+a { color: #5fd3f3; }
+</style>
+</head>
+<body>
+<main>
+  <h1>404</h1>
+  <p>No street by that name. Cities live at <code>commit.city/&lt;user&gt;</code> or <code>commit.city/&lt;owner&gt;/&lt;repo&gt;</code>.</p>
+  <form onsubmit="event.preventDefault(); const t = this.q.value.trim().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?github\.com\//, '').replace(/^\/+|\/+$/g, ''); if (t) location.href = '/' + t.split('/').slice(0, 2).join('/');">
+    <input name="q" placeholder="user or owner/repo" aria-label="GitHub user or owner/repo" autofocus><button>Go</button>
+  </form>
+  <p><a href="/">commit.city home</a></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>commit.city · your GitHub, as a living city</title>
+<meta name="description" content="Replay a year of GitHub history as a 3D city time-lapse. Every file is a building, every commit a pulse of light. Swap github.com for commit.city in any user, org or repo URL.">
+<link rel="canonical" href="https://commit.city/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="commit.city">
+<meta property="og:title" content="commit.city · your GitHub, as a living city">
+<meta property="og:description" content="Every file is a building, every commit a pulse of light. Swap github.com for commit.city in any user, org or repo URL.">
+<meta property="og:url" content="https://commit.city/">
+<meta property="og:image" content="https://commit.city/api/og">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://commit.city/api/og">
+<meta name="theme-color" content="#04060c">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #04060c; --bg2: #0a1120; --ink: #e8eef7; --ink-2: #b4c0d3; --muted: #7f8ca2; --accent: #5fd3f3; --accent-2: #2c8fd6;
+  --line: rgba(255, 255, 255, 0.08); --panel: rgba(10, 16, 28, 0.72); --warm: #ffd479;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+code, pre { font-family: var(--mono); }
+.wrap { width: min(1180px, 100%); margin: 0 auto; padding: 0 20px; }
+.glow { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.glow::before { content: ""; position: absolute; left: 50%; top: -260px; width: 1400px; height: 900px; transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(44, 143, 214, 0.22), transparent 70%); }
+.glow::after { content: ""; position: absolute; inset: 0; opacity: 0.4;
+  background-image: linear-gradient(rgba(95, 211, 243, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(95, 211, 243, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px; mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%); }
+
+/* nav */
+nav.top { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  background: rgba(4, 6, 12, 0.6); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
+nav.top .wrap { display: flex; align-items: center; gap: 22px; height: 58px; }
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--ink); font-weight: 750; font-size: 17px; letter-spacing: -0.015em; }
+.brand:hover { text-decoration: none; }
+.brand img { width: 26px; height: 26px; }
+.brand .wm span { color: var(--accent); }
+nav.top .links { display: flex; gap: 20px; margin-left: 8px; }
+nav.top .links a { color: var(--ink-2); font-size: 14px; }
+nav.top .links a:hover { color: var(--ink); text-decoration: none; }
+.star { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 9px;
+  border: 1px solid var(--line); color: var(--ink); font-size: 13.5px; background: rgba(255, 255, 255, 0.03); }
+.star:hover { background: rgba(255, 255, 255, 0.07); text-decoration: none; }
+.star svg { width: 16px; height: 16px; fill: currentColor; }
+.star b { color: var(--warm); font-weight: 650; }
+.star .n { color: var(--ink-2); font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); padding-left: 8px; }
+
+/* hero */
+header.hero { position: relative; padding: 64px 0 40px; }
+.hero .wrap { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 48px; align-items: center; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); border: 1px solid var(--line);
+  border-radius: 99px; padding: 4px 12px 4px 6px; background: rgba(255, 255, 255, 0.03); }
+.eyebrow i { font-style: normal; background: rgba(95, 211, 243, 0.16); color: var(--accent); border-radius: 99px; padding: 1px 8px; font-weight: 650; font-size: 11.5px; }
+h1 { font-size: clamp(38px, 5.6vw, 64px); line-height: 1.02; letter-spacing: -0.035em; margin: 18px 0 18px; font-weight: 800; }
+h1 em { font-style: normal; background: linear-gradient(92deg, #8ff0ff, #5fd3f3 40%, #6aa8ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lede { font-size: 18px; color: var(--ink-2); max-width: 540px; margin: 0 0 28px; }
+.lede b { color: var(--ink); font-weight: 600; }
+form.swap { display: flex; align-items: stretch; max-width: 560px; border-radius: 14px; border: 1px solid rgba(95, 211, 243, 0.32);
+  background: rgba(8, 14, 26, 0.85); box-shadow: 0 0 0 4px rgba(95, 211, 243, 0.06), 0 20px 60px rgba(0, 0, 0, 0.45); overflow: hidden; }
+form.swap:focus-within { border-color: rgba(95, 211, 243, 0.7); box-shadow: 0 0 0 4px rgba(95, 211, 243, 0.14), 0 20px 60px rgba(0, 0, 0, 0.45); }
+form.swap label { display: flex; align-items: center; padding-left: 16px; color: var(--muted); font-family: var(--mono); font-size: 15px; white-space: nowrap; }
+form.swap input { flex: 1 1 0; width: 0; min-width: 0; background: none; border: 0; outline: 0; color: var(--ink); font-family: var(--mono); font-size: 15px; padding: 16px 8px 16px 1px; }
+form.swap input::placeholder { color: #4d5a70; }
+form.swap button { margin: 6px; padding: 0 18px; border-radius: 10px; background: var(--accent); color: #04121a; font-weight: 700; font-size: 14.5px; white-space: nowrap; }
+form.swap button:hover { background: #8fe6fb; }
+.hint { margin: 12px 0 0; color: var(--muted); font-size: 13.5px; }
+.hint code { color: var(--ink-2); font-size: 12.5px; }
+.hint s { color: #5a6578; }
+.nw { white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.chips a { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 5px; border-radius: 99px; border: 1px solid var(--line);
+  color: var(--ink-2); font-size: 13px; background: rgba(255, 255, 255, 0.025); }
+.chips a:hover { color: var(--ink); border-color: rgba(95, 211, 243, 0.35); text-decoration: none; }
+.chips img { width: 22px; height: 22px; border-radius: 50%; background: #0e1522; }
+.chips small { color: var(--muted); font-size: 11px; }
+.stage { position: relative; aspect-ratio: 16 / 11; border-radius: 18px; overflow: hidden; border: 1px solid rgba(95, 211, 243, 0.22);
+  background: #04060c center / contain no-repeat; box-shadow: 0 30px 120px rgba(20, 90, 160, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; transition: opacity 1s; }
+.stage iframe.on { opacity: 1; }
+.stage .cap { position: absolute; left: 12px; bottom: 12px; z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 8px;
+  border-radius: 99px; background: rgba(4, 6, 12, 0.75); border: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); backdrop-filter: blur(8px); }
+.stage .cap:hover { color: var(--ink); text-decoration: none; }
+.stage .cap i { width: 7px; height: 7px; border-radius: 50%; background: #4fd18b; box-shadow: 0 0 8px #4fd18b; }
+.stage .play { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; }
+.stage .play span { padding: 12px 18px; border-radius: 99px; background: rgba(4, 6, 12, 0.8); border: 1px solid rgba(95, 211, 243, 0.4); font-weight: 650; font-size: 14px; }
+
+/* sections */
+section { position: relative; padding: 72px 0; }
+section + section { border-top: 1px solid var(--line); }
+.kick { color: var(--accent); font-size: 12.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.1; letter-spacing: -0.025em; margin: 10px 0 14px; font-weight: 780; }
+.sub { color: var(--ink-2); max-width: 720px; margin: 0 0 32px; font-size: 16.5px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { border: 1px solid var(--line); border-radius: 16px; padding: 22px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)); }
+.card h3 { margin: 8px 0 8px; font-size: 18px; letter-spacing: -0.01em; }
+.card p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+.card .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(95, 211, 243, 0.1); color: var(--accent); font-weight: 800; font-family: var(--mono); }
+.card .eg { margin-top: 14px; font-family: var(--mono); font-size: 13px; }
+.steps { counter-reset: s; }
+.steps .card h3::before { counter-increment: s; content: "0" counter(s); display: block; color: var(--accent); font-family: var(--mono); font-size: 13px; margin-bottom: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; color: var(--ink-2); font-size: 13.5px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 11px; height: 11px; border-radius: 3px; }
+
+/* gallery */
+.gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.gal a { display: block; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #070b14; color: var(--ink); transition: transform 0.2s, border-color 0.2s; }
+.gal a:hover { transform: translateY(-2px); border-color: rgba(95, 211, 243, 0.35); text-decoration: none; }
+.gal img.sky { display: block; width: 100%; aspect-ratio: 860 / 300; background: #04060c; }
+.gal .meta { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.gal .meta img { width: 28px; height: 28px; border-radius: 50%; background: #0e1522; }
+.gal .meta div { min-width: 0; }
+.gal .meta b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gal .meta small { color: var(--muted); font-size: 12px; }
+.gal-h { display: flex; align-items: baseline; justify-content: space-between; margin: 34px 0 14px; }
+.gal-h h3 { margin: 0; font-size: 17px; }
+.gal-h small { color: var(--muted); }
+.empty { color: var(--muted); font-size: 14px; border: 1px dashed var(--line); border-radius: 14px; padding: 22px; text-align: center; }
+
+/* readme card */
+.readme { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 32px; align-items: center; }
+.readme img { width: 100%; border-radius: 14px; border: 1px solid var(--line); aspect-ratio: 860 / 300; background: #04060c; }
+.field { display: flex; gap: 8px; margin: 18px 0 10px; }
+.field input { flex: 1; min-width: 0; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); padding: 10px 12px; font-family: var(--mono); font-size: 14px; outline: 0; }
+.field input:focus { border-color: rgba(95, 211, 243, 0.5); }
+.snip { display: flex; gap: 8px; align-items: stretch; }
+.snip pre { flex: 1; min-width: 0; margin: 0; padding: 12px 14px; border-radius: 10px; background: #070b14; border: 1px solid var(--line); color: var(--ink-2); font-size: 12.5px; overflow-x: auto; white-space: pre; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); color: var(--ink); font-size: 14px; font-weight: 600; background: rgba(255, 255, 255, 0.04); }
+.btn:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
+.btn.primary { background: var(--accent); color: #04121a; border-color: transparent; }
+.btn.primary:hover { background: #8fe6fb; }
+.btn svg { width: 16px; height: 16px; fill: currentColor; }
+.opts { display: flex; gap: 16px; margin-top: 10px; color: var(--ink-2); font-size: 13.5px; }
+.opts label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.opts input { accent-color: var(--accent); }
+
+/* self-host */
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.two pre { margin: 14px 0 0; padding: 14px; border-radius: 10px; background: #070b14; border: 1px solid var(--line); color: var(--ink-2); font-size: 12.5px; overflow-x: auto; line-height: 1.6; }
+.two pre .c { color: #5a6a82; }
+
+/* faq */
+.faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 32px; }
+details { border-bottom: 1px solid var(--line); padding: 14px 0; }
+summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+summary::after { content: "+"; color: var(--muted); font-weight: 400; }
+details[open] summary::after { content: "–"; }
+details p { color: var(--ink-2); margin: 10px 0 0; font-size: 14.5px; }
+
+footer { border-top: 1px solid var(--line); padding: 36px 0 calc(40px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 13.5px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; }
+footer .wrap > :last-child { margin-left: auto; }
+footer a { color: var(--ink-2); }
+
+@media (max-width: 980px) {
+  .hero .wrap, .readme { grid-template-columns: minmax(0, 1fr); }
+  .grid3, .two, .faq { grid-template-columns: 1fr; }
+  nav.top .links { display: none; }
+  header.hero { padding-top: 40px; }
+}
+@media (max-width: 520px) {
+  form.swap label { display: none; }
+  form.swap input { padding-left: 14px; }
+  form.swap button .long { display: none; }
+  .star .n { display: none; }
+  footer .wrap > :last-child { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap">
+  <a class="brand" href="/"><img src="/favicon.svg" alt=""><span class="wm">commit<span>.city</span></span></a>
+  <div class="links"><a href="#gallery">Gallery</a><a href="#how">How it works</a><a href="#card">README card</a><a href="#run">Private repos</a><a href="#faq">FAQ</a></div>
+  <a class="star" href="https://github.com/azank1/commit-city" target="_blank" rel="noopener"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><b>★</b> Star<span class="n" id="stars" hidden></span></a>
+</div></nav>
+
+<header class="hero">
+  <div class="glow"></div>
+  <div class="wrap">
+    <div>
+      <span class="eyebrow"><i>new</i> open source · free · public data only</span>
+      <h1>Your GitHub,<br>as a <em>living city</em>.</h1>
+      <p class="lede">Every file is a building. Every commit is a pulse of light. commit.city replays a year of git history,
+        <b>commit by commit</b>, as a 3D city you can scrub, fly through and share. Works for people, orgs and repos.</p>
+      <form class="swap" id="swap" role="search">
+        <label for="q">commit.city/</label>
+        <input id="q" name="q" placeholder="username or owner/repo" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="GitHub user, org or owner/repo">
+        <button type="submit">Build<span class="long"> the city</span> →</button>
+      </form>
+      <p class="hint">Or swap the domain on any GitHub URL: <span class="nw"><code><s>github.com</s>/torvalds</code> → <code>commit.city/torvalds</code></span></p>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="stage" id="stage">
+      <a class="cap" id="cap" href="/sindresorhus"><i></i><span>live · commit.city/sindresorhus</span></a>
+    </div>
+  </div>
+</header>
+
+<section id="kinds">
+  <div class="wrap">
+    <div class="kick">Three ways in</div>
+    <h2>A person, an org, or a single repo.</h2>
+    <p class="sub">The URL decides what gets drawn. Islands are repos, stacked platforms are directories and towers are files.
+      A tower's height is its line count, so you watch the code itself grow, shrink and move as the year plays back.</p>
+    <div class="grid3">
+      <div class="card"><div class="ic">@</div><h3>Your year</h3><p>Every public repo you committed to in the last year, the files you touched lighting up as your commits land. Your avatar floats at the centre, wired to every island.</p><div class="eg"><a href="/sindresorhus">commit.city/sindresorhus</a></div></div>
+      <div class="card"><div class="ic">{}</div><h3>An organization</h3><p>The org's busiest 24 repos with everyone's commits, so you can see where the work actually happens: which islands boom, which go quiet, which appear out of nowhere.</p><div class="eg"><a href="/vercel">commit.city/vercel</a></div></div>
+      <div class="card"><div class="ic">/</div><h3>One repository</h3><p>A single codebase and every contributor's commits. Add <code>?all=1</code> to replay its entire history from the first commit, as long as the repo fits the hosted builder.</p><div class="eg"><a href="/facebook/react">commit.city/facebook/react</a></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="gallery">
+  <div class="wrap">
+    <div class="kick">Gallery</div>
+    <h2>Cities people have built.</h2>
+    <p class="sub">Every city is public data and cached, so opening one someone else built is instant.</p>
+    <div class="gal-h"><h3>Featured</h3></div>
+    <div class="gal" id="featured"><div class="empty">Loading…</div></div>
+    <div class="gal-h"><h3>Fresh off the press</h3><small>the latest builds</small></div>
+    <div class="gal" id="recent"><div class="empty">Loading…</div></div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="kick">How it works</div>
+    <h2>Real history, not an estimate.</h2>
+    <p class="sub">commit.city does not guess from contribution counts. It reads git itself and replays what happened to every file, so a tower is exactly as tall as that file was on that day.</p>
+    <div class="grid3 steps">
+      <div class="card"><h3>Discover</h3><p>GitHub's GraphQL API finds the repos and, for a person, which commits are theirs. A whole city costs a handful of API points.</p></div>
+      <div class="card"><h3>Replay</h3><p>The builder speaks git's own wire protocol to GitHub, fetches only the history packs it needs, and replays the default branch commit by commit: every path, every line count, every rename.</p></div>
+      <div class="card"><h3>Render</h3><p>The viewer turns that into instanced three.js geometry with bloom, a day-night sky and a scrubbable timeline, around 60&nbsp;fps on a laptop and adaptive on phones.</p></div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+</section>
+
+<section id="card">
+  <div class="wrap readme">
+    <div>
+      <div class="kick">For your profile</div>
+      <h2>A live card for your README.</h2>
+      <p class="sub" style="margin-bottom:0">The skyline is your actual city, frozen at today. It links back to the 3D version and refreshes whenever the city is rebuilt.</p>
+      <div class="field"><input id="cardq" placeholder="your GitHub username" autocomplete="off" spellcheck="false" aria-label="GitHub username"><button class="btn primary" id="cardgo">Preview</button></div>
+      <div class="snip"><pre id="snip">[![my commit city](https://commit.city/api/card?t=YOU)](https://commit.city/YOU)</pre><button class="btn" id="copy">Copy</button></div>
+      <div class="opts"><label><input type="checkbox" id="light"> light theme</label><label><input type="checkbox" id="still"> no animation</label></div>
+    </div>
+    <img id="cardimg" alt="A commit.city README card" src="/api/card?t=sindresorhus" loading="lazy">
+  </div>
+</section>
+
+<section id="run">
+  <div class="wrap">
+    <div class="kick">Private repos and self-hosting</div>
+    <h2>Run it yourself. Your token never leaves your repo.</h2>
+    <p class="sub">commit.city only ever reads public data. For a city that includes private work, run the same open-source pipeline in your own GitHub Actions or on your laptop. It publishes one self-contained HTML page and private repos are anonymised by default.</p>
+    <div class="two">
+      <div class="card"><h3>GitHub Action</h3><p>Click <b>Use this template</b> on the repo, enable Pages, and run the workflow. It rebuilds weekly, and only repos with new commits are fetched again.</p>
+<pre><span class="c"># .github/workflows/commit-city.yml</span>
+- uses: azank1/commit-city@v0
+  with:
+    token: ${{ secrets.COMMIT_CITY_TOKEN || github.token }}</pre></div>
+      <div class="card"><h3>Command line</h3><p>Python 3.11+ and git. It writes one HTML file you can open offline or host anywhere, and picks up your <code>gh</code> login if you have one.</p>
+<pre>pipx install git+https://github.com/azank1/commit-city
+commit-city build --login you --include-private
+<span class="c"># -&gt; commit-city.html</span></pre></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="kick">FAQ</div>
+    <h2>Questions.</h2>
+    <div class="faq">
+      <details id="privacy" open><summary>What data does it read? Is my code stored?</summary><p>Public repositories only. Commit times and authors come from GitHub's API; file paths and line counts come from replaying git history over GitHub's git protocol. No source code is stored, only paths, line counts and times, the same things anyone can see on GitHub. Cities and repo records are cached so the next visitor gets them instantly.</p></details>
+      <details><summary>How do I hide my city, or leave a repo out?</summary><p>Open your city, press <b>Share</b>, then <b>Sign in with GitHub</b>. Sign-in requests no permissions. Untick repos to leave them out, or hide your city and your repo cities entirely. Org owners who want an org city hidden can <a href="https://github.com/azank1/commit-city/issues/new?title=Hide%20an%20org%20city">open an issue</a>.</p></details>
+      <details><summary>Why are my numbers lower than my contribution graph?</summary><p>GitHub's graph also counts pull requests, issues, reviews and private contributions. A city draws commits that landed on the default branch of a public repo, because those are the ones that changed the code you can see.</p></details>
+      <details><summary>What are the limits?</summary><p>People get up to 50 repos, orgs their 24 busiest. The hosted builder skips repos over 1.5&nbsp;GB, and very large cities fold the deepest directories into blocks so the browser stays smooth. The CLI and Action have no such limits.</p></details>
+      <details><summary>Why is the first build slow?</summary><p>It replays real git history from GitHub, and big repos take a minute or two. Every repo record is shared between cities, so popular repos are usually already cached, and your next rebuild only replays what changed.</p></details>
+      <details><summary>Is this affiliated with GitHub?</summary><p>No. commit.city is an independent, MIT-licensed open-source project. GitHub is a trademark of GitHub, Inc.</p></details>
+    </div>
+  </div>
+</section>
+
+<footer><div class="wrap">
+  <a class="brand" href="/" style="font-size:15px"><img src="/favicon.svg" alt="" style="width:20px;height:20px"><span class="wm">commit<span>.city</span></span></a>
+  <span>MIT licensed · <a href="https://github.com/azank1/commit-city">source on GitHub</a> · <a href="https://github.com/azank1/commit-city/issues">issues</a></span>
+  <span>Not affiliated with GitHub.</span>
+</div></footer>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const compact = n => n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n);
+  const parse = v => {
+    let t = String(v || '').trim().replace(/^@/, '');
+    try { if (/^https?:\/\//i.test(t)) t = new URL(t).pathname; } catch { /* as typed */ }
+    t = t.replace(/^(?:www\.)?github\.com\//i, '').replace(/^(?:www\.)?commit\.city\//i, '').replace(/^\/+|\/+$/g, '').replace(/\.git$/, '');
+    return t.split('/').filter(Boolean).slice(0, 2).join('/');
+  };
+  $('swap').addEventListener('submit', e => {
+    e.preventDefault();
+    const t = parse($('q').value);
+    if (t) location.href = `/${t}`; else $('q').focus();
+  });
+  if (/[?&]signin=/.test(location.search)) history.replaceState(null, '', '/');
+
+  const CHIPS = [['sindresorhus', 'person'], ['torvalds', 'person'], ['vercel', 'org'], ['facebook/react', 'repo'], ['denoland/deno', 'repo'], ['rust-lang', 'org']];
+  $('chips').innerHTML = CHIPS.map(([t, k]) => `<a href="/${t}"><img src="https://github.com/${t.split('/')[0]}.png?size=44" alt="" loading="lazy">${esc(t)}<small>${k}</small></a>`).join('');
+
+  const LANGS = [['TS / JS', '#3987e5'], ['Python', '#d95926'], ['Docs', '#199e70'], ['SQL / data', '#c98500'], ['Markup / styles', '#d55181'], ['Config / data', '#008300'], ['Shell / infra', '#9085e9'], ['Other code', '#e66767'], ['Other files', '#7d7b75']];
+  $('legend').innerHTML = '<span style="color:var(--muted)">Tower colour = file type:</span>' + LANGS.map(([n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join('');
+
+  // the live hero: a real city, loaded once the page itself is done
+  const HERO = 'sindresorhus';
+  const stage = $('stage');
+  stage.style.backgroundImage = `url(/api/card?t=${HERO}&layout=sky)`;
+  const mount = () => {
+    if (stage.querySelector('iframe')) return;
+    const f = document.createElement('iframe');
+    f.title = `${HERO}'s commit city`;
+    f.loading = 'lazy';
+    const from = new Date(Date.now() - 120 * 86400e3).toISOString().slice(0, 10);   // most of the city already standing
+    f.src = `/${HERO}#embed=1&hud=0&speed=1d&t=${from}`;
+    f.addEventListener('load', () => setTimeout(() => f.classList.add('on'), 1200));
+    stage.appendChild(f);
+  };
+  const wide = matchMedia('(min-width: 981px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (wide) addEventListener('load', () => (window.requestIdleCallback || setTimeout)(mount, { timeout: 1500 }));
+  else {
+    const p = document.createElement('button');
+    p.className = 'play'; p.innerHTML = '<span>▶ Play the live city</span>';
+    p.onclick = () => { p.remove(); mount(); };
+    stage.appendChild(p);
+  }
+
+  // gallery
+  const tile = e => `<a href="/${esc(e.target)}"><img class="sky" src="/api/card?t=${encodeURIComponent(e.target)}&animate=0" alt="" loading="lazy">
+    <div class="meta"><img src="${esc(e.avatar)}${e.avatar.includes('?') ? '&' : '?'}s=56" alt="" loading="lazy"><div><b>${esc(e.target)}</b>
+    <small>${e.kind} · ${compact(e.commits)} commits · ${e.repos} repo${e.repos === 1 ? '' : 's'}</small></div></div></a>`;
+  fetch('/api/gallery').then(r => r.json()).then(g => {
+    $('featured').innerHTML = g.featured.length ? g.featured.map(tile).join('') : '<div class="empty">Featured cities appear here once built.</div>';
+    const seen = new Set(g.featured.map(e => e.key));
+    const recent = g.recent.filter(e => !seen.has(e.key)).slice(0, 18);
+    $('recent').innerHTML = recent.length ? recent.map(tile).join('') : '<div class="empty">No fresh cities yet. Build the first one above.</div>';
+  }).catch(() => { $('featured').innerHTML = $('recent').innerHTML = '<div class="empty">The gallery is taking a break.</div>'; });
+
+  // README card builder
+  const cardFor = () => {
+    const t = parse($('cardq').value) || 'YOU';
+    const opts = ($('light').checked ? '&theme=light' : '') + ($('still').checked ? '&animate=0' : '');
+    const md = `[![${t} on commit.city](${location.origin}/api/card?t=${t}${opts})](${location.origin}/${t})`;
+    $('snip').textContent = md;
+    if (t !== 'YOU') $('cardimg').src = `/api/card?t=${encodeURIComponent(t)}${opts}`;
+    return md;
+  };
+  $('cardgo').onclick = cardFor;
+  $('cardq').addEventListener('keydown', e => { if (e.key === 'Enter') cardFor(); });
+  $('light').onchange = $('still').onchange = cardFor;
+  $('copy').onclick = async () => {
+    const md = cardFor();
+    try { await navigator.clipboard.writeText(md); $('copy').textContent = 'Copied'; } catch { $('copy').textContent = 'Select it'; }
+    setTimeout(() => ($('copy').textContent = 'Copy'), 1500);
+  };
+  const me = document.cookie.match(/(?:^|; )cc_user=([^;]*)/);
+  if (me) { $('cardq').value = decodeURIComponent(me[1]); cardFor(); }
+
+  fetch('/api/stars').then(r => r.json()).then(s => {
+    if (s && s.stars) { $('stars').textContent = compact(s.stars); $('stars').hidden = false; }
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
