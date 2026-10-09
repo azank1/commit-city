@@ -1,5 +1,6 @@
 # Offline checks for every push and PR: the Python builder, the hosted engine (typecheck + parity tests against
 # the Python replay on synthetic repos), and that the committed viewer builds match their sources.
+# Upstream and PRs to it only: repos made from the template just build their city (commit-city.yml).
 name: ci
 
 on:
@@ -12,6 +13,7 @@ permissions:
 
 jobs:
   python:
+    if: github.repository == 'azank1/commit-city'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +23,7 @@ jobs:
       - run: python -m unittest discover -s tests
 
   web:
+    if: github.repository == 'azank1/commit-city'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,6 +43,7 @@ jobs:
       - run: npm test
 
   viewer:
+    if: github.repository == 'azank1/commit-city'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
