@@ -3,3 +3,4 @@ Allow: /
 Disallow: /api/
 Allow: /api/og
 Allow: /api/card
+Sitemap: https://commit.city/sitemap.xml

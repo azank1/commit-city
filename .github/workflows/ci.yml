@@ -1,5 +1,5 @@
 # Offline checks for every push and PR: the Python builder, the hosted engine (typecheck + parity tests against
-# the Python replay on synthetic repos), and that the committed viewer builds match their sources.
+# the Python replay on synthetic repos), and that the committed viewer builds and site pages match their sources.
 # Upstream and PRs to it only: repos made from the template just build their city (commit-city.yml).
 name: ci
 
@@ -51,10 +51,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: viewer/package-lock.json
+          cache-dependency-path: |
+            viewer/package-lock.json
+            web/package-lock.json
       - run: npm ci
         working-directory: viewer
+      - run: npm ci
+        working-directory: web
       - run: node viewer/build.mjs
+      - run: node web/scripts/site.mjs
       - name: committed builds are up to date
         run: |
           git status --porcelain

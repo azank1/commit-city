@@ -1,5 +1,6 @@
 // README card: /api/card?t=<user|org|owner/repo>[&all=1][&theme=light][&animate=0] -> SVG.
-// &layout=sky gives the skyline alone (no text, transparent), as the landing page's poster.
+// &layout=sky gives the skyline alone (no text, transparent), as the landing page's poster; &layout=thumb is a
+// lighter 640x400 skyline for gallery tiles.
 import { avatarUri } from '../lib/avatar.js';
 import { cardSVG, skySVG } from '../lib/card.js';
 import { readMeta, readSettings, readSky } from '../lib/city.js';
@@ -17,13 +18,16 @@ export const GET = handle(async req => {
   const u = new URL(req.url);
   const theme = u.searchParams.get('theme') === 'light' ? 'light' : 'dark';
   const animate = u.searchParams.get('animate') !== '0';
-  const bare = u.searchParams.get('layout') === 'sky';
+  const layout = u.searchParams.get('layout');
+  const bare = layout === 'sky' || layout === 'thumb';
+  const sky1 = (s: Parameters<typeof skySVG>[0], av: string | null) =>
+    layout === 'thumb' ? skySVG(s, av, false, 640, 400, 420) : skySVG(s, av, animate);
   let target;
-  try { target = parseTarget(u.searchParams.get('t')); } catch { return svg(bare ? skySVG(null, null) : cardSVG(null, null, '?', theme, false), false); }
+  try { target = parseTarget(u.searchParams.get('t')); } catch { return svg(bare ? sky1(null, null) : cardSVG(null, null, '?', theme, false), false); }
   const name = target.kind === 'owner' ? target.login : `${target.owner}/${target.name}`;
   const owner = target.kind === 'owner' ? target.login : target.owner;
   const [meta, settings] = await Promise.all([readMeta(cityKey(target, wantsWhole(u.searchParams.get('all')))), readSettings(owner)]);
   const m = settings.hidden ? null : meta;
   const [sky, avatar] = m ? await Promise.all([readSky(m), avatarUri(m.avatar, 96)]) : [null, null];
-  return svg(bare ? skySVG(sky, avatar, animate) : cardSVG(m, sky, name, theme, animate, avatar), !!m);
+  return svg(bare ? sky1(sky, avatar) : cardSVG(m, sky, name, theme, animate, avatar), !!m);
 });

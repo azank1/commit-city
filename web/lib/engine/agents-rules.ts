@@ -1,0 +1,335 @@
+// Generated from schema/agents.json by schema/sync.mjs. Do not edit.
+import type { Rules } from './agents.js';
+
+export const RULES: Rules = {
+  "version": 1,
+  "agents": [
+    {
+      "id": "claude",
+      "label": "Claude",
+      "color": "#d97757",
+      "author": [
+        "^claude\\[bot\\] <",
+        "\\+claude\\[bot\\]@users\\.noreply\\.github\\.com>",
+        "<noreply@anthropic\\.com>"
+      ],
+      "coauthor": [
+        "claude\\[bot\\]",
+        "<noreply@anthropic\\.com>",
+        "^claude\\b[^<]*<[^>]*@anthropic\\.com>"
+      ],
+      "message": [
+        "generated with \\[?claude code"
+      ],
+      "login": [
+        "^claude\\[bot\\]$"
+      ],
+      "branch": [
+        "^claude/"
+      ]
+    },
+    {
+      "id": "copilot",
+      "label": "Copilot",
+      "color": "#a78bfa",
+      "author": [
+        "^copilot-swe-agent\\[bot\\] <",
+        "^copilot <",
+        "\\+copilot(-swe-agent\\[bot\\])?@users\\.noreply\\.github\\.com>"
+      ],
+      "coauthor": [
+        "^copilot\\b",
+        "copilot-swe-agent\\[bot\\]",
+        "\\+copilot@users\\.noreply\\.github\\.com>",
+        "<copilot@github\\.com>"
+      ],
+      "login": [
+        "^copilot$",
+        "^copilot-swe-agent\\[bot\\]$"
+      ],
+      "branch": [
+        "^copilot/"
+      ]
+    },
+    {
+      "id": "cursor",
+      "label": "Cursor",
+      "color": "#e2e8f0",
+      "author": [
+        "<cursoragent@cursor\\.com>",
+        "^cursor\\[bot\\] <",
+        "\\+cursor\\[bot\\]@users\\.noreply\\.github\\.com>"
+      ],
+      "coauthor": [
+        "<cursoragent@cursor\\.com>",
+        "cursor\\[bot\\]"
+      ],
+      "login": [
+        "^cursor\\[bot\\]$",
+        "^cursoragent$"
+      ],
+      "branch": [
+        "^cursor/"
+      ]
+    },
+    {
+      "id": "codex",
+      "label": "Codex",
+      "color": "#10a37f",
+      "author": [
+        "chatgpt-codex-connector\\[bot\\]",
+        "<codex@openai\\.com>"
+      ],
+      "coauthor": [
+        "chatgpt-codex-connector\\[bot\\]",
+        "<codex@openai\\.com>",
+        "^(openai )?codex\\b[^<]*<[^>]*@openai\\.com>"
+      ],
+      "login": [
+        "^chatgpt-codex-connector\\[bot\\]$"
+      ],
+      "branch": [
+        "^codex/"
+      ]
+    },
+    {
+      "id": "devin",
+      "label": "Devin",
+      "color": "#2dd4bf",
+      "author": [
+        "devin-ai-integration\\[bot\\]"
+      ],
+      "coauthor": [
+        "devin-ai-integration\\[bot\\]"
+      ],
+      "message": [
+        "app\\.devin\\.ai/sessions/"
+      ],
+      "login": [
+        "^devin-ai-integration\\[bot\\]$"
+      ],
+      "branch": [
+        "^devin/"
+      ]
+    },
+    {
+      "id": "jules",
+      "label": "Jules",
+      "color": "#e879f9",
+      "author": [
+        "google-labs-jules\\[bot\\]"
+      ],
+      "coauthor": [
+        "google-labs-jules\\[bot\\]"
+      ],
+      "message": [
+        "jules\\.google\\.com/task/"
+      ],
+      "login": [
+        "^google-labs-jules\\[bot\\]$"
+      ]
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini",
+      "color": "#4f8ef7",
+      "author": [
+        "gemini-code-assist\\[bot\\]",
+        "gemini-cli\\[bot\\]",
+        "^gemini-cli <"
+      ],
+      "coauthor": [
+        "gemini-code-assist\\[bot\\]",
+        "gemini-cli",
+        "^gemini\\b[^<]*<[^>]*@google\\.com>"
+      ],
+      "message": [
+        "generated with \\[?gemini cli"
+      ],
+      "login": [
+        "^gemini-code-assist\\[bot\\]$",
+        "^gemini-cli(\\[bot\\])?$"
+      ]
+    },
+    {
+      "id": "aider",
+      "label": "Aider",
+      "color": "#a3e635",
+      "author": [
+        "\\(aider\\) <"
+      ],
+      "coauthor": [
+        "@aider\\.chat>"
+      ],
+      "message": [
+        "^aider: "
+      ]
+    },
+    {
+      "id": "amp",
+      "label": "Amp",
+      "color": "#f43f5e",
+      "author": [
+        "<amp@ampcode\\.com>"
+      ],
+      "coauthor": [
+        "<amp@ampcode\\.com>"
+      ],
+      "message": [
+        "(^|\\n)amp-thread(-id)?:",
+        "ampcode\\.com/threads/"
+      ]
+    },
+    {
+      "id": "openhands",
+      "label": "OpenHands",
+      "color": "#fde047",
+      "author": [
+        "<openhands@all-hands\\.dev>",
+        "openhands-ai\\[bot\\]",
+        "^openhands-agent <"
+      ],
+      "coauthor": [
+        "<openhands@all-hands\\.dev>",
+        "openhands-ai\\[bot\\]"
+      ],
+      "login": [
+        "^openhands-agent$",
+        "^openhands-ai\\[bot\\]$"
+      ],
+      "branch": [
+        "^openhands-fix-issue-"
+      ]
+    },
+    {
+      "id": "replit",
+      "label": "Replit Agent",
+      "color": "#f59e0b",
+      "message": [
+        "(^|\\n)replit-commit-author: (agent|assistant)\\b"
+      ]
+    },
+    {
+      "id": "lovable",
+      "label": "Lovable",
+      "color": "#f472b6",
+      "author": [
+        "gpt-engineer-app\\[bot\\]",
+        "lovable-dev\\[bot\\]"
+      ],
+      "coauthor": [
+        "gpt-engineer-app\\[bot\\]",
+        "lovable-dev\\[bot\\]"
+      ],
+      "login": [
+        "^(gpt-engineer-app|lovable-dev)\\[bot\\]$"
+      ]
+    },
+    {
+      "id": "v0",
+      "label": "v0",
+      "color": "#fecdd3",
+      "author": [
+        "^v0\\[bot\\] <",
+        "[+<]v0\\[bot\\]@"
+      ],
+      "coauthor": [
+        "^v0\\[bot\\] <",
+        "[+<]v0\\[bot\\]@"
+      ],
+      "login": [
+        "^v0\\[bot\\]$"
+      ]
+    },
+    {
+      "id": "junie",
+      "label": "Junie",
+      "color": "#4ade80",
+      "author": [
+        "jetbrains-junie\\[bot\\]",
+        "<junie@jetbrains\\.com>"
+      ],
+      "coauthor": [
+        "jetbrains-junie\\[bot\\]",
+        "<junie@jetbrains\\.com>"
+      ],
+      "login": [
+        "^jetbrains-junie\\[bot\\]$"
+      ]
+    },
+    {
+      "id": "sweep",
+      "label": "Sweep",
+      "color": "#7dd3fc",
+      "author": [
+        "sweep-ai\\[bot\\]"
+      ],
+      "coauthor": [
+        "sweep-ai\\[bot\\]"
+      ],
+      "login": [
+        "^sweep-ai\\[bot\\]$"
+      ],
+      "branch": [
+        "^sweep/"
+      ]
+    },
+    {
+      "id": "factory",
+      "label": "Factory",
+      "color": "#fed7aa",
+      "author": [
+        "factory-droid\\[bot\\]"
+      ],
+      "coauthor": [
+        "factory-droid\\[bot\\]"
+      ],
+      "login": [
+        "^factory-droid\\[bot\\]$"
+      ]
+    },
+    {
+      "id": "coderabbit",
+      "label": "CodeRabbit",
+      "color": "#ff7a1a",
+      "author": [
+        "coderabbitai\\[bot\\]"
+      ],
+      "coauthor": [
+        "coderabbitai\\[bot\\]"
+      ],
+      "login": [
+        "^coderabbitai\\[bot\\]$"
+      ],
+      "branch": [
+        "^coderabbitai/"
+      ]
+    }
+  ],
+  "bot": {
+    "author": [
+      "\\[bot\\]",
+      "^[^<]*[-_]bot <",
+      "<[^>]*[-_]bot@",
+      "^dependabot(-preview)?\\b",
+      "@dependabot\\.com>",
+      "^renovate( ?bot)? <",
+      "@renovateapp\\.com>",
+      "^github[- ]actions?\\b",
+      "<github-actions@github\\.com>",
+      "<action@github\\.com>",
+      "^semantic-release-bot\\b",
+      "^imgbotapp\\b",
+      "^all-?contributors\\b",
+      "^greenkeeper(io)?\\b",
+      "^snyk-bot\\b",
+      "^mergify\\b",
+      "^pre-commit-ci\\b"
+    ],
+    "login": [
+      "\\[bot\\]$",
+      "-bot$",
+      "^(dependabot|dependabot-preview|github-actions|renovate|imgbotapp|allcontributors|greenkeeperio-bot|mergify|pre-commit-ci|web-flow)$"
+    ]
+  }
+};

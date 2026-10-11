@@ -105,11 +105,43 @@ export function ogSVG(meta: Meta | null, sky: Sky | null, target: string, avatar
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`;
 }
 
-/** The skyline alone on a transparent ground, for posters: 880x605 (16:11) by default. */
-export function skySVG(sky: Sky | null, avatar: string | null, animate = true, W = 880, H = 605): string {
+/** The site's own pages, previewed: a headline over a placeholder skyline. 1200x630. */
+const SITE_OG: Record<string, { kick: string; title: [string, string]; sub: [string, string]; path: string }> = {
+  home: { kick: 'COMMIT.CITY', title: ['Your GitHub,', 'as a living city.'], sub: ['Swap github.com for commit.city on any', 'profile, org or repo.'], path: '' },
+  events: { kick: '● GITHUB, LIVE', title: ['All of GitHub,', 'right now.'], sub: ['Every public push, PR and release as a beam,', 'sorted by people, bots and AI agents.'], path: '/events' },
+  explore: { kick: 'EXPLORE', title: ['Every city,', 'so far.'], sub: ['People, orgs and repos, replayed as', 'cities you can fly through.'], path: '/explore' },
+  readme: { kick: 'README CARD', title: ['Your city,', 'on your profile.'], sub: ['A live card with your skyline, stats', 'and language mix.'], path: '/readme' },
+  about: { kick: 'HOW IT WORKS', title: ['Git history,', 'drawn to scale.'], sub: ['What a city shows, what it stores,', 'and how to run it yourself.'], path: '/about' },
+};
+export function siteOgSVG(page: string): string {
+  const P = SITE_OG[page] ?? SITE_OG.home;
+  const T = THEMES.dark;
+  const W = 1200, H = 630;
+  const kickFill = page === 'events' ? '#4fd18b' : '#5fd3f3';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#03050a"/><stop offset="1" stop-color="#0b1526"/></linearGradient>
+    <radialGradient id="glow" cx=".72" cy="1" r=".8"><stop offset="0" stop-color="#2c8fd6" stop-opacity=".4"/><stop offset="1" stop-color="#2c8fd6" stop-opacity="0"/></radialGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#03050a" stop-opacity=".85"/><stop offset=".55" stop-color="#03050a" stop-opacity="0"/></linearGradient></defs>
+    <rect width="${W}" height="${H}" fill="url(#bg)"/><rect width="${W}" height="${H}" fill="url(#glow)"/>
+    ${placeholderSky(560, 120, 620, 500)}
+    <rect width="${W}" height="${H}" fill="url(#fade)"/>
+    <g ${FONT}>
+      <text x="64" y="104" font-size="20" font-weight="700" letter-spacing="3" fill="${kickFill}">${esc(P.kick)}</text>
+      <text x="62" y="196" font-size="72" font-weight="700" letter-spacing="-2" fill="${T.ink}">${esc(P.title[0])}</text>
+      <text x="62" y="278" font-size="72" font-weight="700" letter-spacing="-2" fill="#5fd3f3">${esc(P.title[1])}</text>
+      <text x="64" y="352" font-size="27" fill="${T.ink2}">${esc(P.sub[0])}</text>
+      <text x="64" y="390" font-size="27" fill="${T.ink2}">${esc(P.sub[1])}</text>
+      <text x="64" y="570" font-size="24" font-weight="700" fill="${T.ink}">commit<tspan fill="#5fd3f3">.city</tspan><tspan font-weight="400" fill="${T.muted}">${esc(P.path)}</tspan></text>
+    </g></svg>`;
+}
+
+/** The skyline alone on a transparent ground, for posters: 880x605 (16:11) by default. `detail` caps the
+ * buildings drawn, so gallery thumbnails stay small. */
+export function skySVG(sky: Sky | null, avatar: string | null, animate = true, W = 880, H = 605, detail = 1100): string {
+  const pad = Math.round(W * 0.032);
   const body = sky
-    ? drawSky(sky, { x: 28, y: 28, w: W - 56, h: H - 56, maxBuildings: 1100, maxPlatforms: 500, beams: true, avatar, rise: animate })
-    : placeholderSky(28, 28, W - 56, H - 56);
+    ? drawSky(sky, { x: pad, y: pad, w: W - 2 * pad, h: H - 2 * pad, maxBuildings: detail, maxPlatforms: Math.round(detail * 0.45), beams: true, avatar, rise: animate })
+    : placeholderSky(pad, pad, W - 2 * pad, H - 2 * pad);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`;
 }
 

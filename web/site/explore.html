@@ -1,0 +1,128 @@
+<!--page {
+  "title": "Explore cities · commit.city",
+  "ogTitle": "Explore commit.city: GitHub people, orgs and repos as 3D cities",
+  "description": "Browse every city built on commit.city: people, organisations and repositories, replayed from their git history as 3D city time-lapses. Filter by type, sort by size or by how much of it AI agents wrote.",
+  "path": "/explore",
+  "ogImage": "/api/og?page=explore"
+}-->
+<style>
+.bar { position: sticky; top: calc(var(--nav-h) + env(safe-area-inset-top, 0px)); z-index: 10; padding: 14px 0; background: rgba(4, 6, 12, 0.82); backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bar .field { flex: 1 1 260px; max-width: 420px; height: 40px; }
+.bar .field svg { width: 16px; height: 16px; stroke: var(--muted); fill: none; stroke-width: 2; flex: none; }
+.bar .count { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.results { padding: 28px 0 80px; }
+.group-h { display: flex; align-items: baseline; gap: 12px; margin: 8px 0 16px; }
+.group-h h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.group-h small { color: var(--muted); font-size: 13px; }
+.cta { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 24px; align-items: center; margin-top: 48px; padding: 28px; border-radius: 20px; border: 1px solid var(--line);
+  background: radial-gradient(100% 140% at 100% 0%, rgba(44, 143, 214, 0.16), transparent 60%), var(--bg-1); }
+.cta h3 { font-size: 22px; letter-spacing: -0.02em; }
+.cta p { color: var(--ink-2); margin: 6px 0 0; }
+.cta form.omni { width: 100%; }
+@media (max-width: 860px) { .cta { grid-template-columns: minmax(0, 1fr); } .bar .count { display: none; } }
+</style>
+<main>
+<header class="phead">
+  <div class="backdrop"></div>
+  <div class="wrap">
+    <span class="kick">Explore</span>
+    <h1 class="h1">Every city, so far.</h1>
+    <p class="lede">People, organisations and repositories other visitors have built. Each one is cached, so it opens instantly.
+      Sort by size, or by how much of it AI agents wrote.</p>
+  </div>
+</header>
+<div class="bar">
+  <div class="wrap">
+    <label class="field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="filter" type="search" placeholder="Filter by name" autocomplete="off" spellcheck="false" aria-label="Filter cities"></label>
+    <div class="seg" role="group" aria-label="Kind" id="kinds">
+      <button aria-pressed="true" data-k="">All</button><button aria-pressed="false" data-k="user">People</button><button aria-pressed="false" data-k="org">Orgs</button><button aria-pressed="false" data-k="repo">Repos</button>
+    </div>
+    <select class="select" id="sort" aria-label="Sort by">
+      <option value="recent">Latest built</option>
+      <option value="commits">Most commits</option>
+      <option value="lines">Most lines</option>
+      <option value="repos">Most repos</option>
+      <option value="agent">Most agent-written</option>
+      <option value="bot">Most bot-written</option>
+    </select>
+    <span class="count" id="count"></span>
+  </div>
+</div>
+<div class="results">
+  <div class="wrap">
+    <div id="featuredBox">
+      <div class="group-h"><h2>Featured</h2><small>hand-picked to show what a city can look like</small></div>
+      <div class="tiles" id="featured"></div>
+      <div class="group-h" id="freshH" style="margin-top:40px"><h2>Fresh off the press</h2><small>the latest builds, newest first</small></div>
+    </div>
+    <div class="tiles" id="grid"></div>
+    <div class="cta">
+      <div><h3>Don't see yours?</h3><p>Build it now. It takes a minute or two, then it's here for everyone.</p></div>
+      <form class="omni sm" data-omni role="search" autocomplete="off">
+        <label class="pre" for="q">commit.city/</label><img class="av" alt="" hidden>
+        <input id="q" type="text" placeholder="username or owner/repo" autocapitalize="off" spellcheck="false" aria-label="GitHub user, org or owner/repo">
+        <button class="btn primary go" type="submit">Build <span class="arrow">→</span></button>
+      </form>
+    </div>
+  </div>
+</div>
+</main>
+
+<script type="module">
+const { $, $$, gallery, tile, skeleton, esc } = window.CCSite;
+const state = { q: '', kind: '', sort: 'recent' };
+const p = new URLSearchParams(location.search);
+if (p.get('kind')) state.kind = p.get('kind');
+if (p.get('sort')) state.sort = p.get('sort');
+if (p.get('q')) state.q = p.get('q');
+$('#filter').value = state.q;
+$('#sort').value = state.sort;
+$$('#kinds button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === state.kind)));
+$('#grid').innerHTML = skeleton(9);
+$('#featured').innerHTML = skeleton(3);
+
+let G = null;
+const SORTS = {
+  recent: () => 0,
+  commits: (a, b) => b.commits - a.commits,
+  lines: (a, b) => b.lines - a.lines,
+  repos: (a, b) => b.repos - a.repos,
+  agent: (a, b) => (b.agent || 0) - (a.agent || 0) || b.commits - a.commits,
+  bot: (a, b) => (b.bot || 0) - (a.bot || 0) || b.commits - a.commits,
+};
+function render() {
+  if (!G) return;
+  const plain = !state.q && !state.kind && state.sort === 'recent';
+  $('#featuredBox').hidden = !plain || !G.featured.length;
+  if (plain) $('#featured').innerHTML = G.featured.map(e => tile(e)).join('');
+  const seen = new Set(plain ? G.featured.map(e => e.key) : []);
+  const q = state.q.trim().toLowerCase();
+  let list = (plain ? G.recent : G.all).filter(e => !seen.has(e.key) && (!state.kind || e.kind === state.kind) && (!q || e.target.toLowerCase().includes(q)));
+  list = list.slice().sort(SORTS[state.sort] || SORTS.recent);
+  $('#grid').innerHTML = list.length ? list.map(e => tile(e)).join('')
+    : `<div class="empty" style="grid-column:1/-1">${q ? `Nothing built matches <b>${esc(q)}</b> yet. <a href="/${esc(window.CCSite.parse(q) || '')}">Build it →</a>` : 'Nothing here yet.'}</div>`;
+  // with nothing beyond the featured cities yet, skip the empty 'fresh' shelf rather than show it
+  const bare = plain && !list.length && G.featured.length;
+  $('#freshH').hidden = $('#grid').hidden = !!bare;
+  const n = (plain ? G.featured.length : 0) + list.length;
+  $('#count').textContent = `${n} ${n === 1 ? 'city' : 'cities'}`;
+  const qs = new URLSearchParams();
+  if (state.q) qs.set('q', state.q);
+  if (state.kind) qs.set('kind', state.kind);
+  if (state.sort !== 'recent') qs.set('sort', state.sort);
+  history.replaceState(null, '', `/explore${qs.toString() ? `?${qs}` : ''}`);
+}
+gallery().then(g => { G = g; render(); });
+$('#filter').addEventListener('input', e => { state.q = e.target.value; render(); });
+$('#sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+$('#kinds').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.kind = b.dataset.k;
+  $$('#kinds button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  render();
+});
+</script>

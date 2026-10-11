@@ -9,6 +9,7 @@ import { localTransport, pythonReplay, Repo, tmpdir } from './helpers';
 
 const DAY = 86400;
 const T0 = 1_750_000_000;
+const GH = '@users.noreply.github.com>';
 
 function scenario(dir: string) {
   const r = new Repo(dir);
@@ -44,6 +45,24 @@ function scenario(dir: string) {
     .write('art/logo.ai', 30).write('blob.dat', 0, Buffer.from('a\0b\nc\n')).write('top.txt', 4).write('x/top.txt', 4)
     .write('logs/2025/app.log', 9).write('sub/.gitattributes', 0, '*.md -diff\n').write('sub/notes.md', 5).write('sub/k/deep.md', 6);
   r.commit(T0 + 19 * DAY, 'Ann', '+0530');
+  // who wrote it: a bot, an agent identity, a Claude Code footer and trailer (CRLF), a bot co-author on a human
+  // commit, a trailer after a lone CR (not a line start, so human), and an agent's side branch merged by a human
+  r.write('package.json', 2);
+  r.commit(T0 + 20 * DAY, `dependabot[bot] <49699333+dependabot[bot]${GH}`, '+0000', undefined, 'Bump x from 1 to 2\n\nSigned-off-by: dependabot[bot] <support@github.com>\n');
+  r.write('src/agent.ts', 4);
+  r.commit(T0 + 20 * DAY + 600, `Copilot <198982749+Copilot${GH}`, '+0000', undefined, 'Add agent\n\nCo-authored-by: Ann <ann@x.test>\n');
+  r.write('src/a.ts', 5);
+  r.commit(T0 + 21 * DAY, 'Ann', '+0530', undefined,
+    'Refactor a\r\n\r\n\u{1f916} Generated with [Claude Code](https://claude.com/claude-code)\r\n\r\nCo-Authored-By: Claude <noreply@anthropic.com>\r\n');
+  r.write('src/a.ts', 6);
+  r.commit(T0 + 21 * DAY + 60, 'Ann', '+0530', undefined, `Deps\n\nCo-authored-by: renovate[bot] <29139614+renovate[bot]${GH}\n`);
+  r.write('src/a.ts', 7);
+  r.commit(T0 + 21 * DAY + 120, 'Ann', '+0530', undefined, 'Fix\rCo-authored-by: Claude <noreply@anthropic.com>\n');
+  r.checkout('-b', 'cursor/settings-1a2b');
+  r.write('src/settings.ts', 9);
+  r.commit(T0 + 22 * DAY, 'Cursor Agent <cursoragent@cursor.com>', '+0000', undefined, 'Add settings\n');
+  r.checkout('main');
+  r.merge('cursor/settings-1a2b', T0 + 22 * DAY + 3600);
   return r;
 }
 
@@ -57,7 +76,7 @@ function compare(ts: RepoRecord, py: ReturnType<typeof pythonReplay>) {
   for (const c of ts.commits) {
     const m = mine.get(c[0]);
     assert.ok(m, `commit ${c[0]} missing from python mine`);
-    assert.deepEqual([c[1], c[2], c[4], c[5]], [m[0], m[1], m[2], m[3]], `commit ${c[0]}`);
+    assert.deepEqual([c[1], c[2], c[4], c[5], c[6]], [m[0], m[1], m[2], m[3], m[5]], `commit ${c[0]}`);
   }
   assert.equal(ts.commits.length, py.mine.length);
 }
@@ -79,6 +98,9 @@ for (const [label, startOffset] of [['mid-window', 10 * DAY], ['window before hi
     assert.equal(last('x/top.txt'), 4);
     assert.equal(last('logs/2025/app.log'), 12);
     assert.equal(last('sub/k/deep.md'), 12);         // nested attributes file
+    const who = record.commits.filter(c => c[1] >= Math.floor((T0 + 20 * DAY) / 60)).map(c => c[6]);
+    assert.deepEqual(who, ['bot', 'copilot', 'claude', '', '', 'cursor', '']);
+    assert.equal(record.v, 2);
     assert.ok(stats.fetches >= 1 && stats.fetches <= 2, `fetches ${stats.fetches}`);
   });
 }

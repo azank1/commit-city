@@ -36,6 +36,13 @@
     "epoch": { "type": "integer", "description": "unix seconds at t = 0" },
     "t_end": { "type": "integer", "minimum": 1, "description": "last minute of the lapse (build time)" },
     "langs": { "type": "array", "items": { "type": "string" }, "maxItems": 9, "description": "language classes in palette order; files reference them by index" },
+    "who": {
+      "type": "array",
+      "prefixItems": [{ "const": "human" }],
+      "items": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+      "minItems": 1,
+      "description": "who wrote the commits, for the agent lens: 'human' first, then 'bot' (automation) if any commit is one, then the ids of AI agents (schema/agents.json) by descending commit count, ties by id. Commit rows reference it by index. Written by every builder since the agent lens; absent in older payloads, where every commit counts as human"
+    },
     "totals": {
       "type": "object",
       "properties": {
@@ -68,10 +75,14 @@
           },
           "m": {
             "type": "array",
-            "description": "your commits: [t (author time), files touched, [file indexes]]",
+            "description": "your commits: [t (author time), files touched, [file indexes]], plus w for a commit not written by a human",
             "items": {
               "type": "array",
-              "prefixItems": [{ "type": "integer" }, { "type": "integer" }, { "type": "array", "items": { "type": "integer" } }],
+              "prefixItems": [
+                { "type": "integer" }, { "type": "integer" }, { "type": "array", "items": { "type": "integer" } },
+                { "type": "integer", "minimum": 1, "description": "w: index into the top-level `who` (never 0); absent means human" }
+              ],
+              "minItems": 3,
               "items": false
             }
           }

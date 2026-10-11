@@ -8,7 +8,7 @@
 Swap `github.com` for `commit.city` on any user, org or repo and watch a year of git history replay,
 commit by commit, as a 3D city you can scrub, fly through and share.
 
-[**Open commit.city →**](https://commit.city) &nbsp;·&nbsp; [README card](#put-it-on-your-profile) &nbsp;·&nbsp; [Private repos](#private-repos-run-it-yourself) &nbsp;·&nbsp; [How it works](#how-it-works)
+[**Open commit.city →**](https://commit.city) &nbsp;·&nbsp; [GitHub, live](https://commit.city/events) &nbsp;·&nbsp; [Agent lens](#humans-bots-and-ai-agents) &nbsp;·&nbsp; [README card](#put-it-on-your-profile) &nbsp;·&nbsp; [Private repos](#private-repos-run-it-yourself) &nbsp;·&nbsp; [How it works](#how-it-works)
 
 [![try it](https://img.shields.io/badge/try_it-commit.city-5fd3f3?style=flat-square)](https://commit.city)
 [![ci](https://img.shields.io/github/actions/workflow/status/azank1/commit-city/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/azank1/commit-city/actions/workflows/ci.yml)
@@ -46,13 +46,31 @@ There's no sign-up and nothing to install. The first visit builds the city while
 | drag the timeline | scrub anywhere |
 | Space · ←/→ · Shift+←/→ | play/pause · ±1 day · ±1 hour |
 | 1–6, ↑/↓ | speed: 1 hr/s … 2 wk/s |
+| A | the agent lens: colour every commit by human, bot or AI agent |
+| R | record a clip of the year (MP4 or WebM, 16:9, 9:16 or 1:1) |
 | Home / End · O · L · H · F | start/now · auto-orbit · labels · hide UI · focus hovered repo |
 
 Every view can be linked. **Share → copy this moment** gives you a URL that reopens at the same time with the same camera, for example:
 
 ```
-https://commit.city/you#t=2026-03-14T21:30&speed=1h&play=1&focus=<repo>&orbit=0&hud=0
+https://commit.city/you#t=2026-03-14T21:30&speed=1h&play=1&focus=<repo>&orbit=0&hud=0&lens=agents
 ```
+
+When the replay reaches today, the city keeps listening: new public pushes, pull requests and releases fly in as beams while the page is open.
+
+## Humans, bots and AI agents
+
+More and more commits are written by AI agents and automation. Press **A** in any city and every beam takes the colour of whoever sent it: people in cyan, bots in amber, and each agent in its own colour. The clock panel breaks the city down by author, the leaderboard splits each repo, and the timeline stacks each day.
+
+A commit is classified from the signatures it carries, in this order:
+
+1. **Its author.** Agents that commit as themselves, like `copilot-swe-agent[bot]` or `devin-ai-integration[bot]`.
+2. **Its message.** A `Co-authored-by:` trailer (Claude Code, Cursor, Copilot and others add one) or a footer such as *Generated with Claude Code*, or Aider's `aider:` prefix.
+3. **Bots.** Any `[bot]` account, plus dependabot, renovate, github-actions and friends.
+
+Everything else counts as human. Agent work that isn't disclosed looks human, so the split is a floor, not an audit. The rules for 17 agents live in one file, [`schema/agents.json`](schema/agents.json), which the Python CLI and the hosted builder share and both test suites check. Adding an agent is a pull request to that file.
+
+[**commit.city/events**](https://commit.city/events) applies the same lens to all of GitHub: the public timeline, a few minutes behind real time, as a city of repos that rise and sink as events arrive. It splits people, bots and agents, using account names and agent branch names such as `claude/…` or `copilot/…`.
 
 ## Put it on your profile
 
@@ -70,7 +88,11 @@ The card is a self-contained SVG, so it renders through GitHub's image proxy. It
 | `&animate=0` | no rise animation |
 | `&all=1` | the whole-history city of a repo |
 
-Every city also gets a link preview, so pasting `commit.city/you` into Slack, X, Discord or LinkedIn unfurls into its skyline. To put a live city on your own site, use `<iframe src="https://commit.city/you#embed=1">`.
+Every city also gets a link preview, so pasting `commit.city/you` into Slack, X, Discord or LinkedIn unfurls into its skyline.
+
+**Clips.** Press **R** (or **Share → Record a clip**) and the year replays in 10, 20 or 30 seconds while the camera orbits. The browser records it as a video, wide for X and LinkedIn or vertical for Reels and Shorts. Nothing is uploaded.
+
+**Embeds.** `<iframe src="https://commit.city/you#embed=1">` puts a live city on your own site. Inside an embed the mouse wheel scrolls your page until the city is clicked; add `&hud=0` for just the city. The [card builder](https://commit.city/readme) writes the snippets for you.
 
 ## Privacy and control
 
@@ -174,14 +196,19 @@ python3 -m unittest discover -s tests                          # Python pipeline
 cd web && npm ci && npm test                                   # hosted engine, incl. parity with the Python replay
 cd web && GITHUB_TOKEN=$(gh auth token) node scripts/dev.mjs   # the whole site on localhost:3000
 cd viewer && npm ci && node build.mjs                          # after viewer edits: rebuild both viewer outputs
+node web/scripts/site.mjs                                      # after edits to web/site/*.html: regenerate the site pages
+node schema/sync.mjs                                           # after edits to schema/agents.json: copy the rules to both builders
 ```
 
 The viewer is plain three.js in `viewer/src`:
 
 - `layout.js` builds the treemap cities and org sectors;
 - `shaders.js` draws the crisp edges, the glow and the beams;
-- `main.js` runs the simulation, HUD and controls;
-- `selftest.js` holds the interaction checks (open any city with `#selftest=1`).
+- `main.js` runs the simulation, HUD, agent lens, recorder and controls;
+- `selftest.js` holds the interaction checks (open any city with `#selftest=1`);
+- `live.js` and `live-selftest.js` are commit.city/events (`/events#selftest=1`, or `#demo=1` for a synthetic feed).
+
+The site's pages are written in `web/site/` (shared head, nav and footer partials, one file per page) and generated into `web/public/` by `web/scripts/site.mjs`. CI fails if a generated file is out of date.
 
 Issues and PRs are welcome.
 
@@ -189,5 +216,5 @@ Issues and PRs are welcome.
 
 MIT © [azank1](https://github.com/azank1).
 
-- Built on [three.js](https://threejs.org), the [Inter](https://rsms.me/inter/) typeface (OFL) and [resvg](https://github.com/RazrFalcon/resvg).
+- Built on [three.js](https://threejs.org), the [Inter](https://rsms.me/inter/) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/) typefaces (OFL) and [resvg](https://github.com/RazrFalcon/resvg).
 - Inspired by every "github.com → something.com" tool that made a repo one URL away.

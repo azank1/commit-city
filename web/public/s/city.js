@@ -18,6 +18,8 @@
   const isRepo = CC.target.includes('/');
   const q = `t=${encodeURIComponent(CC.target)}${CC.all ? '&all=1' : ''}`;
   if (EMBED) document.body.classList.add('embed');
+  // an embedding page (like commit.city's own home) hears when there is nothing to show, so it can fall back
+  const tellParent = status => { if (EMBED && parent !== window) try { parent.postMessage({ cc: status, target: CC.target }, '*'); } catch { /* cross-origin parent gone */ } };
 
   class ApiError extends Error {
     constructor(status, info) { super(info.error || `HTTP ${status}`); this.status = status; this.info = info; }
@@ -108,7 +110,7 @@
   }
   function show(html) { box.innerHTML = `<div class="cc-box">${html}</div>`; box.hidden = false; }
   const foot = `<p class="cc-foot">Public data only: default-branch history of public repos, read with git and GitHub's API.
-    No code is stored, only paths, sizes and times. <a href="/#privacy">Privacy &amp; opt-out</a></p>`;
+    No code is stored, only paths, sizes and times. <a href="/about#privacy">Privacy &amp; opt-out</a></p>`;
 
   function showFinding() {
     show(`${head('commit.city', CC.target, isRepo ? null : `https://github.com/${encodeURIComponent(CC.target)}.png?size=112`)}
@@ -120,7 +122,7 @@
     show(`${head('commit.city', CC.target, isRepo ? null : `https://github.com/${encodeURIComponent(CC.target)}.png?size=112`)}
       <p class="cc-sub">There is no city for <b>${esc(CC.target)}</b> yet. Building one replays a year of its public git history;
       it takes a minute or two and is then cached for everyone.</p>
-      <div class="cc-actions"><button class="cc-primary" id="cc-start">Build this city</button><a href="/">Explore others</a></div>${foot}`);
+      <div class="cc-actions"><button class="cc-primary" id="cc-start">Build this city</button><a href="/explore">Explore others</a></div>${foot}`);
     $('cc-start').onclick = () => start();
   }
 
@@ -222,17 +224,19 @@
       const whole = isRepo && !CC.all;
       return show(`${head('commit.city', CC.target)}<p class="cc-sub">${esc(e.message)}.
         ${isRepo ? '' : 'Commits count once they land on the default branch of a public repo; private work and other branches are not visible.'}</p>
-        <div class="cc-actions">${whole ? `<a class="cc-primary" href="/${esc(CC.target)}?all=1">Build its whole history</a>` : ''}<a href="/">Explore other cities</a></div>${foot}`);
+        <div class="cc-actions">${whole ? `<a class="cc-primary" href="/${esc(CC.target)}?all=1">Build its whole history</a>` : ''}<a href="/explore">Explore other cities</a></div>${foot}`);
     }
     showError(e && e.status === 401 ? 'This build took longer than its ticket allows. Retry and it will pick up where it stopped.' : (e && e.message) || String(e), true);
   }
 
   function showHidden() {
+    tellParent('missing');
     show(`${head('commit.city', CC.target)}<p class="cc-sub">This city is hidden by its owner.</p>
-      <div class="cc-actions"><a class="cc-primary" href="/">Explore other cities</a></div>`);
+      <div class="cc-actions"><a class="cc-primary" href="/explore">Explore other cities</a></div>`);
   }
 
   function showError(msg, retry) {
+    tellParent('error');
     show(`${head('commit.city', CC.target)}<div class="cc-err">${esc(msg)}</div>
       <div class="cc-actions">${retry ? '<button class="cc-primary" id="cc-retry">Try again</button>' : ''}<a href="/">Home</a>
       <a href="https://github.com/azank1/commit-city/issues/new" target="_blank" rel="noopener">Report a problem</a></div>`);
@@ -304,7 +308,7 @@
     const off = (D.tz && D.tz.offset) || 0;
     const when = new Date((L.EPOCH + L.T * 60 + off * 60) * 1000).toISOString().slice(0, 16);
     const c = L.camera.position, t = L.controls.target, r = v => Math.round(v * 10) / 10;
-    return `${location.origin}${pagePath()}#t=${when}&cam=${[c.x, c.y, c.z, t.x, t.y, t.z].map(r).join(',')}&play=0`;
+    return `${location.origin}${pagePath()}#t=${when}&cam=${[c.x, c.y, c.z, t.x, t.y, t.z].map(r).join(',')}&play=0${L.lens ? '&lens=agents' : ''}`;
   }
 
   const share = $('cc-share');
@@ -329,6 +333,9 @@
           <a href="https://bsky.app/intent/compose?text=${encodeURIComponent(`${text} ${url}`)}" target="_blank" rel="noopener">Bluesky</a>
           <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}" target="_blank" rel="noopener">LinkedIn</a>
         </div></div>
+      <div class="cc-sec"><h3>Make a clip</h3>
+        <p>Record the year replaying as a video, wide or vertical, right in your browser.</p>
+        <div class="cc-row"><button class="cc-primary" id="cc-rec">● Record a clip</button><button id="cc-lens">${window.__lapse && window.__lapse.lens ? 'Agent lens: on' : 'Agent lens'}</button></div></div>
       <div class="cc-sec"><h3>Put it on your profile README</h3>
         <p>A live card that links back here. It refreshes whenever the city is rebuilt.</p>
         <img class="cc-card" src="${esc(card)}" alt="">
@@ -338,6 +345,8 @@
           `Sign in as ${esc(owner)} to leave repos out or hide this city. Sign-in asks for no permissions.`}</p>
         <div class="cc-row">${mine ? '<button id="cc-manage" class="cc-primary">Manage my city</button><button id="cc-out">Sign out</button>' :
           `<a class="cc-primary" href="${signInUrl()}">Sign in with GitHub</a>`}</div></div>` : ''}`);
+    const rc = $('cc-rec'); if (rc) rc.onclick = () => { sheet(null); if (window.__lapse) window.__lapse.toggleRecPanel(true); };
+    const ln = $('cc-lens'); if (ln) ln.onclick = () => { if (!window.__lapse) return; window.__lapse.setLens(!window.__lapse.lens); ln.textContent = window.__lapse.lens ? 'Agent lens: on' : 'Agent lens'; };
     const mg = $('cc-manage'); if (mg) mg.onclick = () => manage(owner);
     const so = $('cc-out'); if (so) so.onclick = async () => { await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {}); location.reload(); };
   });
@@ -383,7 +392,7 @@
     try { s = await call(`/api/city?${q}`); } catch (e) { return showError(e.message, true); }
     if (s.status === 'ready') return open(s.meta);
     if (s.status === 'hidden') return showHidden();
-    if (EMBED) return show(`${head('commit.city', CC.target)}<p class="cc-sub">No city here yet.</p>`);
+    if (EMBED) { tellParent('missing'); return show(`${head('commit.city', CC.target)}<p class="cc-sub">No city here yet. <a href="/${esc(CC.target)}" target="_blank" rel="noopener">Build it on commit.city ↗</a></p>`); }
     if (BOT) return showOffer();
     return start();
   })();

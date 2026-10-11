@@ -1,0 +1,604 @@
+<!--page {
+  "title": "commit.city · your GitHub, as a living city",
+  "description": "Swap github.com for commit.city on any GitHub profile, org or repo and watch a year of commits replay as a 3D city. Every file a tower, every commit a beam of light, every AI agent accounted for.",
+  "path": "/",
+  "bodyClass": "home"
+}-->
+<style>
+/* hero */
+.hero { position: relative; padding: clamp(40px, 6vw, 84px) 0 clamp(40px, 6vw, 72px); }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); gap: clamp(32px, 4vw, 64px); align-items: center; }
+.hero .h1 { margin: 20px 0 22px; }
+.hero .lede { max-width: 560px; margin: 0 0 30px; }
+.hero .lede code { color: var(--ink); background: rgba(255, 255, 255, 0.06); padding: 1px 6px; border-radius: 6px; font-size: 0.86em; }
+.hero form.omni { max-width: 600px; }
+.tryrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; color: var(--muted); font-size: 13px; }
+.tryrow .chips { display: contents; }
+.tryrow > span:first-child { margin-right: 2px; }
+.stagebox { position: relative; }
+.stage { position: relative; aspect-ratio: 16 / 11; border-radius: 22px; overflow: hidden; border: 1px solid rgba(95, 211, 243, 0.22);
+  background: radial-gradient(90% 70% at 50% 100%, rgba(44, 143, 214, 0.18), transparent 70%), #04060c center / contain no-repeat;
+  box-shadow: 0 40px 140px rgba(20, 90, 160, 0.32), 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 0.9s; }
+.stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; transition: opacity 1.1s; }
+.stage iframe.on { opacity: 1; }
+.stage .shield { position: absolute; inset: 0; z-index: 2; display: grid; place-items: end center; padding-bottom: 18px; cursor: grab; }
+.stage .shield span { padding: 7px 13px; border-radius: 99px; background: rgba(4, 6, 12, 0.72); border: 1px solid var(--line); color: var(--ink-2); font-size: 12.5px;
+  backdrop-filter: blur(8px); opacity: 0; transform: translateY(6px); transition: 0.3s; }
+.stage:hover .shield span { opacity: 1; transform: none; }
+.stage .cap { position: absolute; left: 14px; top: 14px; z-index: 3; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 9px; border-radius: 99px;
+  background: rgba(4, 6, 12, 0.72); border: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); backdrop-filter: blur(8px); font-family: var(--mono); }
+.stage .cap:hover { color: var(--ink); text-decoration: none; border-color: rgba(95, 211, 243, 0.4); }
+.stage .cap i { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); }
+.stage .open { position: absolute; right: 14px; top: 14px; z-index: 3; }
+.stage .open .btn { background: rgba(4, 6, 12, 0.72); backdrop-filter: blur(8px); }
+.tabs { display: flex; justify-content: center; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+.tabs button { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 13px 0 5px; border-radius: 99px; border: 1px solid var(--line); color: var(--ink-2);
+  font-size: 13px; background: rgba(255, 255, 255, 0.02); transition: 0.15s; }
+.tabs button img { width: 26px; height: 26px; border-radius: 50%; background: var(--bg-3); }
+.tabs button small { color: var(--muted); font-size: 11.5px; }
+.tabs button:hover { color: var(--ink); border-color: var(--line-2); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-color: rgba(95, 211, 243, 0.5); background: var(--accent-soft); }
+@media (max-width: 980px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); } .hero .lede { max-width: none; } }
+
+/* the URL swap */
+.swapband { padding: 26px 0; border-block: 1px solid var(--line); background: linear-gradient(90deg, transparent, rgba(95, 211, 243, 0.035), transparent); }
+.swapband .wrap { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.urlbar { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-1);
+  font: 500 clamp(14px, 1.8vw, 18px) var(--mono); color: var(--ink); min-width: min(440px, 100%); }
+.urlbar svg { width: 14px; height: 14px; fill: var(--muted); flex: none; }
+.urlbar .url { display: inline-flex; align-items: center; white-space: nowrap; }
+.urlbar .dom { position: relative; display: inline-grid; }
+.urlbar .dom span { justify-self: end; }
+.urlbar .dom span { grid-area: 1 / 1; transition: opacity 0.35s, transform 0.35s var(--ease), color 0.35s; }
+.urlbar .dom .a { color: var(--muted); }
+.urlbar .dom .b { color: var(--accent); opacity: 0; transform: translateY(60%); }
+.urlbar.swapped .dom .a { opacity: 0; transform: translateY(-60%); }
+.urlbar.swapped .dom .b { opacity: 1; transform: none; }
+.urlbar .path { color: var(--ink); }
+.urlbar .caret { width: 2px; height: 1.1em; background: var(--accent); animation: blink 1s steps(1) infinite; margin-left: 3px; }
+@keyframes blink { 50% { opacity: 0; } }
+.swapband p { margin: 0; color: var(--muted); font-size: 14px; }
+
+/* read the city */
+.read { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 56px); align-items: center; }
+.read > :first-child { position: sticky; top: calc(var(--nav-h, 64px) + 40px); align-self: start; }
+.iso { width: 100%; aspect-ratio: 1.45; display: block; }
+.iso .el { transition: opacity 0.3s; }
+.iso.dimmed .el { opacity: 0.22; }
+.iso.dimmed .el.hl { opacity: 1; }
+.iso .lbl { font: 600 11px var(--mono); fill: var(--ink-2); letter-spacing: 0.02em; }
+.keys { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.keys li { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 13px 14px; border-radius: 13px; border: 1px solid transparent; cursor: default; transition: 0.2s; }
+.keys li:hover, .keys li.on { background: rgba(255, 255, 255, 0.035); border-color: var(--line); }
+.keys .sw { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--bg-2); border: 1px solid var(--line); }
+.keys .sw svg { width: 20px; height: 20px; }
+.keys b { display: block; font-weight: 650; font-size: 15px; letter-spacing: -0.01em; }
+.keys span { color: var(--ink-2); font-size: 14px; }
+.langs { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 18px; color: var(--muted); font-size: 12.5px; }
+.langs span { display: inline-flex; align-items: center; gap: 6px; }
+.langs i { width: 9px; height: 9px; border-radius: 2px; }
+@media (max-width: 900px) { .read { grid-template-columns: minmax(0, 1fr); } .read > :first-child { position: static; } }
+
+/* agents */
+.agents { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.agents .card { padding: 28px; display: flex; flex-direction: column; }
+.agents .card .h3 { margin: 14px 0 6px; }
+.livebig { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 22px 0 14px; }
+.livebig div { display: flex; flex-direction: column; gap: 2px; }
+.livebig b { font-size: clamp(28px, 3.4vw, 40px); font-weight: 760; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.livebig label { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.livebig label i { width: 8px; height: 8px; border-radius: 2px; }
+.feed { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-height: 196px; }
+.feed li { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 6px 4px; border-radius: 8px; font-size: 13px; color: var(--ink-2); animation: feedin 0.5s var(--ease); }
+.feed li img { width: 24px; height: 24px; border-radius: 50%; background: var(--bg-3); }
+.feed li .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed li .tx b { color: var(--ink); font-weight: 600; }
+.feed li .tg { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+@keyframes feedin { from { opacity: 0; transform: translateY(-6px); } }
+.agentlist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 22px 0 6px; }
+.agentlist a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; color: var(--ink-2); font-size: 13.5px; }
+.agentlist a:hover { text-decoration: none; color: var(--ink); }
+.agentlist .split { grid-column: 1 / -1; height: 7px; }
+.agentlist .nm { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.agentlist .pc { font-variant-numeric: tabular-nums; color: var(--agent); }
+.roster { margin-top: 22px; }
+.roster small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+.roster div { display: flex; flex-wrap: wrap; gap: 6px; }
+.ag { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 99px; font-size: 12px; color: var(--ink-2);
+  border: 1px solid color-mix(in srgb, var(--c) 32%, transparent); background: color-mix(in srgb, var(--c) 7%, transparent); }
+.ag i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.agents .foot2 { margin-top: auto; padding-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.beams { display: flex; gap: 16px; margin-top: 18px; }
+.beams div { flex: 1; text-align: center; padding: 14px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-1); }
+.beams svg { width: 100%; height: 54px; }
+.beams b { display: block; font-size: 13px; margin-top: 6px; }
+.beams small { color: var(--muted); font-size: 11.5px; }
+@media (max-width: 900px) { .agents { grid-template-columns: minmax(0, 1fr); } }
+
+/* share */
+.share .card { display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.share .card .h3 { margin-top: 2px; }
+.share .card p { margin: 0; }
+.share .media { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #04060c; }
+.share .media img { display: block; width: 100%; }
+.unfurl { border-left: 3px solid #4a5568; padding-left: 12px; font-size: 13px; color: var(--ink-2); }
+.unfurl b { display: block; color: #6cb6ff; font-size: 13.5px; }
+.unfurl img { margin-top: 8px; border-radius: 8px; border: 1px solid var(--line); display: block; width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; background: #04060c; }
+.vid { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #04060c; }
+.vid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vidmeta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vidmeta small { color: var(--muted); font-size: 12px; margin-left: auto; }
+.vidmeta .rec { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 99px; border: 1px solid rgba(255, 90, 90, 0.35); font: 600 11px var(--mono); color: #ff8a8a; }
+.vidmeta .rec i { width: 7px; height: 7px; border-radius: 50%; background: #ff5a5a; animation: blink 1.2s steps(1) infinite; }
+.vidmeta .fmt { display: flex; gap: 6px; }
+.vidmeta .fmt span { padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); font: 500 11px var(--mono); color: var(--ink-2); }
+
+/* self host */
+.host .card pre { font-size: 12.5px; }
+.host .card .code { margin-top: 16px; }
+
+/* faq */
+.faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; }
+.faq details { border-bottom: 1px solid var(--line); padding: 16px 0; }
+.faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 16px; font-weight: 600; font-size: 15.5px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: 20px; line-height: 1; transition: transform 0.2s; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { margin: 10px 0 0; color: var(--ink-2); font-size: 14.5px; }
+@media (max-width: 800px) { .faq { grid-template-columns: minmax(0, 1fr); } }
+
+/* closing */
+.closing { text-align: center; }
+.closing .h2 { margin: 14px auto 26px; max-width: 760px; }
+.closing form.omni { max-width: 620px; margin: 0 auto; text-align: left; }
+</style>
+
+<main>
+<section class="hero">
+  <div class="backdrop"></div>
+  <div class="wrap">
+    <div>
+      <a class="pill rv" href="#agents"><i>new</i>The agent lens: see what AI wrote, commit by commit →</a>
+      <h1 class="h1 rv d1">Your GitHub,<br>as a <span class="grad">living city</span>.</h1>
+      <p class="lede rv d2">Swap <code>github.com</code> for <code>commit.city</code> on any profile, org or repo. A year of git history replays as a 3D city:
+        <b>every file a tower, every commit a beam of light</b>, every bot and AI agent accounted for.</p>
+      <form class="omni rv d3" data-omni role="search" autocomplete="off">
+        <label class="pre" for="q">commit.city/</label>
+        <img class="av" alt="" hidden>
+        <input id="q" type="text" placeholder="username or owner/repo" autocapitalize="off" spellcheck="false" aria-label="GitHub user, org or owner/repo">
+        <label class="check opt" hidden title="Replay the repo's entire history, not just the last year"><input type="checkbox"> all history</label>
+        <button class="btn primary go" type="submit">Build<span class="long"> the city</span> <span class="arrow">→</span></button>
+      </form>
+      <div class="tryrow rv d3"><span>Try</span><span class="chips" id="try"></span></div>
+    </div>
+    <div class="stagebox rv d2">
+      <div class="stage" id="stage">
+        <img class="poster" id="poster" alt="">
+        <a class="cap" id="cap" href="/sindresorhus"><i></i><span id="capt">commit.city/sindresorhus</span></a>
+        <div class="open"><a class="btn sm" id="openit" href="/sindresorhus">Open <span class="arrow">→</span></a></div>
+        <div class="shield" id="shield"><span>Drag to orbit · click to explore</span></div>
+      </div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Example cities"></div>
+    </div>
+  </div>
+</section>
+
+<div class="swapband">
+  <div class="wrap">
+    <div class="urlbar" id="urlbar" aria-label="github.com becomes commit.city">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 7V5a4 4 0 118 0v2h.5A1.5 1.5 0 0114 8.5v5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 13.5v-5A1.5 1.5 0 013.5 7H4zm2 0h4V5a2 2 0 10-4 0v2z"/></svg>
+      <span class="url"><span class="dom"><span class="a">github.com</span><span class="b">commit.city</span></span><span class="path" id="urlpath">/torvalds</span><span class="caret"></span></span>
+    </div>
+    <p>Same URL, one word different. Works for <b>people</b>, <b>orgs</b> and <b>repos</b>, and <span class="mono">?all=1</span> replays a repo from its first commit.</p>
+  </div>
+</div>
+
+<section class="section" id="read">
+  <div class="wrap read">
+    <div class="rv">
+      <svg class="iso" id="iso" viewBox="0 0 620 428" role="img" aria-label="An annotated miniature city: an island, platforms, towers and a commit beam"></svg>
+    </div>
+    <div>
+      <div class="section-head rv" style="margin-bottom:22px">
+        <span class="kick">Reading a city</span>
+        <h2 class="h2">Real history, drawn to scale.</h2>
+        <p>commit.city doesn't estimate from contribution counts. It replays git itself, so a tower is exactly as tall as that file was on that day.</p>
+      </div>
+      <ul class="keys rv d1" id="keys"></ul>
+      <div class="langs rv d2" id="langs"></div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section" id="agents">
+  <div class="wrap">
+    <div class="section-head rv">
+      <span class="kick">Humans, bots and agents</span>
+      <h2 class="h2">Who's actually writing the code?</h2>
+      <p>More and more commits come from AI agents and automation. commit.city reads the signatures they leave (bot accounts, agent branches,
+        <span class="mono">Co-authored-by</span> trailers) and colours every beam by who sent it.</p>
+    </div>
+    <div class="agents">
+      <div class="card rv">
+        <span class="kick" style="color:var(--good)"><i class="live-dot" style="margin-right:2px"></i>GitHub, right now</span>
+        <h3 class="h3">The public timeline, live.</h3>
+        <p>The latest public events on all of GitHub, sorted by who sent them.</p>
+        <div class="livebig">
+          <div><b id="lv-h">–</b><label><i style="background:var(--human)"></i>humans</label></div>
+          <div><b id="lv-b">–</b><label><i style="background:var(--bot)"></i>bots</label></div>
+          <div><b id="lv-a">–</b><label><i style="background:var(--agent)"></i>AI agents</label></div>
+        </div>
+        <div class="split" id="lv-split"><span class="h" style="flex-grow:1"></span><span class="b" style="flex-grow:0"></span><span class="a" style="flex-grow:0"></span></div>
+        <ul class="feed" id="feed"></ul>
+        <div class="foot2"><a class="btn" href="/events"><i class="live-dot"></i>Watch it live <span class="arrow">→</span></a><small class="dim" id="lv-note"></small></div>
+      </div>
+      <div class="card rv d1">
+        <span class="kick" style="color:var(--agent)">The agent lens</span>
+        <h3 class="h3">Every city, split by author.</h3>
+        <p>Press <kbd>A</kbd> in any city and its beams recolour: people, automation and AI. The panel breaks it down by agent and by repo, at every moment of the year.</p>
+        <div class="beams" aria-hidden="true">
+          <div><svg viewBox="0 0 100 54"><path d="M10 48 Q50 -6 90 30" fill="none" stroke="var(--human)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 7"><animate attributeName="stroke-dashoffset" from="22" to="0" dur="0.9s" repeatCount="indefinite"/></path></svg><b>Human</b><small>your commits</small></div>
+          <div><svg viewBox="0 0 100 54"><path d="M10 48 Q50 -6 90 30" fill="none" stroke="var(--bot)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 7"><animate attributeName="stroke-dashoffset" from="22" to="0" dur="1.3s" repeatCount="indefinite"/></path></svg><b>Bot</b><small>dependabot, actions</small></div>
+          <div><svg viewBox="0 0 100 54"><path d="M10 48 Q50 -6 90 30" fill="none" stroke="var(--agent)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 7"><animate attributeName="stroke-dashoffset" from="22" to="0" dur="0.7s" repeatCount="indefinite"/></path></svg><b>Agent</b><small>Claude, Copilot, Codex…</small></div>
+        </div>
+        <div class="agentlist" id="agentlist" hidden></div>
+        <div class="roster"><small>Recognises {{agentCount}} agents today, from rules anyone can read and extend</small><div>{{agentChips}}</div></div>
+        <div class="foot2"><a class="btn" href="/about#agents">How detection works <span class="arrow">→</span></a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section" id="explore">
+  <div class="wrap">
+    <div class="section-head rv" style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;max-width:none;flex-wrap:wrap">
+      <div style="max-width:640px"><span class="kick">Explore</span><h2 class="h2">Cities people have built.</h2>
+        <p>Every city is public data, cached once built, so opening one someone else made is instant.</p></div>
+      <a class="btn" href="/explore">Browse all cities <span class="arrow">→</span></a>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section share" id="share">
+  <div class="wrap">
+    <div class="section-head rv">
+      <span class="kick">Share it</span>
+      <h2 class="h2">Made to be shown off.</h2>
+      <p>Every city comes with a README card, a link preview, a video clip and an embed. All of it updates when the city is rebuilt.</p>
+    </div>
+    <div class="grid g2">
+      <div class="card rv">
+        <h3 class="h3">A live card for your README</h3>
+        <p>Your actual skyline, frozen at today. It renders through GitHub's image proxy and links back to the 3D city.</p>
+        <div class="media"><img id="cardimg" alt="A commit.city README card" loading="lazy" src="/api/card?t=sindresorhus" style="aspect-ratio:860/300"></div>
+        <div class="code"><pre id="cardmd">[![my city](https://commit.city/api/card?t=YOU)](https://commit.city/YOU)</pre><button class="copy" data-copy="#cardmd">Copy</button></div>
+        <a class="btn" href="/readme" style="align-self:flex-start">Make yours <span class="arrow">→</span></a>
+      </div>
+      <div class="card rv d1">
+        <h3 class="h3">A clip of your year</h3>
+        <p>Hit <b>Record</b> in any city for a short video of the whole year playing back, wide for X and LinkedIn or vertical for Reels and Shorts. It renders in your browser.</p>
+        <div class="vid"><img src="/s/timelapse.webp" alt="A city time-lapse" loading="lazy"></div>
+        <div class="vidmeta"><span class="rec"><i></i>REC 00:12</span><span class="fmt"><span>16:9</span><span>9:16</span><span>1:1</span></span><small>MP4 or WebM, straight from your browser</small></div>
+      </div>
+      <div class="card rv">
+        <h3 class="h3">Link previews that are the city</h3>
+        <p>Paste <span class="mono">commit.city/you</span> into Slack, Discord, X or LinkedIn and it unfurls into your skyline and stats.</p>
+        <div class="unfurl"><b>sindresorhus · commit city</b>A GitHub history, replayed as a 3D city time-lapse.<img src="/api/og?t=sindresorhus" alt="A link preview image" loading="lazy"></div>
+      </div>
+      <div class="card rv d1">
+        <h3 class="h3">Embed it anywhere</h3>
+        <p>Drop the live, orbitable city into a portfolio, a blog post or a docs page. Hash parameters pick the moment, speed and camera.</p>
+        <div class="code"><pre><span class="k">&lt;iframe</span> <span class="v">src</span>=<span class="s">"https://commit.city/you#embed=1"</span>
+        <span class="v">width</span>=<span class="s">"100%"</span> <span class="v">height</span>=<span class="s">"480"</span><span class="k">&gt;&lt;/iframe&gt;</span></pre><button class="copy" data-copy='&lt;iframe src="https://commit.city/you#embed=1" width="100%" height="480" style="border:0;border-radius:12px"&gt;&lt;/iframe&gt;'>Copy</button></div>
+        <a class="btn ghost" href="/about#api" style="align-self:flex-start;margin-left:-12px">All parameters <span class="arrow">→</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section host" id="self-host">
+  <div class="wrap">
+    <div class="section-head rv">
+      <span class="kick">Private repos</span>
+      <h2 class="h2">Run it yourself. Your token never leaves your repo.</h2>
+      <p>commit.city only ever reads public data. For a city with your private work in it, run the same open-source pipeline in GitHub Actions or on your laptop.
+        It writes one self-contained HTML page, and private repos are anonymised by default.</p>
+    </div>
+    <div class="grid g2">
+      <div class="card rv">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2v6m0 8v6M4.9 4.9l4.2 4.2m5.8 5.8l4.2 4.2M2 12h6m8 0h6M4.9 19.1l4.2-4.2m5.8-5.8l4.2-4.2"/></svg></div>
+        <h3 class="h3" style="margin-top:14px">GitHub Action</h3>
+        <p>Click <b>Use this template</b>, turn on Pages and run the workflow. It rebuilds every week and only re-reads repos that moved.</p>
+        <div class="code"><pre><span class="c"># .github/workflows/commit-city.yml</span>
+<span class="k">- uses:</span> azank1/commit-city@v0
+  <span class="k">with:</span>
+    <span class="v">token:</span> ${{ secrets.COMMIT_CITY_TOKEN || github.token }}</pre><button class="copy" data-copy="- uses: azank1/commit-city@v0
+  with:
+    token: ${{ secrets.COMMIT_CITY_TOKEN || github.token }}">Copy</button></div>
+        <a class="btn" style="margin-top:16px" href="https://github.com/new?template_name=commit-city&amp;template_owner=azank1" target="_blank" rel="noopener">Use the template <span class="arrow">→</span></a>
+      </div>
+      <div class="card rv d1">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg></div>
+        <h3 class="h3" style="margin-top:14px">Command line</h3>
+        <p>Python 3.11+ and git, no other dependencies. It picks up your <span class="mono">gh</span> login and writes one HTML file you can open offline.</p>
+        <div class="code"><pre>pipx install git+https://github.com/azank1/commit-city
+commit-city build --login <span class="v">you</span> --include-private
+<span class="c"># → commit-city.html</span></pre><button class="copy" data-copy="pipx install git+https://github.com/azank1/commit-city">Copy</button></div>
+        <a class="btn" style="margin-top:16px" href="/about#self-host">Setup guide <span class="arrow">→</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="section-head rv"><span class="kick">FAQ</span><h2 class="h2">Questions, answered.</h2></div>
+    <div class="faq rv">
+      <details open><summary>What does it read? Is my code stored?</summary><p>Public repositories only. Paths and line counts come from replaying git history over GitHub's own git protocol; commit times come from git and GitHub's API. No source code is kept: a city stores paths, line counts and timestamps, the things anyone can already see on GitHub.</p></details>
+      <details><summary>How do I hide my city or leave a repo out?</summary><p>Open your city, press <b>Share</b>, then <b>Sign in with GitHub</b>. Sign-in asks for no permissions. Untick repos to leave them out, or hide your city and your repo cities entirely. <a href="/about#opt-out">More</a></p></details>
+      <details><summary>How does it know what an AI agent wrote?</summary><p>From the signatures agents leave: their bot accounts (like <span class="mono">copilot-swe-agent[bot]</span>), <span class="mono">Co-authored-by</span> trailers (Claude Code adds one), message footers and agent branch names. Agent work that isn't disclosed looks human. <a href="/about#agents">Details</a></p></details>
+      <details><summary>Why are my numbers lower than my contribution graph?</summary><p>GitHub's graph also counts pull requests, issues, reviews and private work. A city draws commits that landed on the default branch of a public repo, because those are what changed the code you can see.</p></details>
+      <details><summary>Why is the first build slow?</summary><p>It replays real history from GitHub, and big repos take a minute or two. Repo records are shared between cities, so popular repos are usually cached already, and a rebuild only replays what changed.</p></details>
+      <details><summary>Is this affiliated with GitHub?</summary><p>No. commit.city is an independent, MIT-licensed open-source project. GitHub is a trademark of GitHub, Inc.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="section closing">
+  <div class="backdrop" style="transform:scaleY(-1)"></div>
+  <div class="wrap">
+    <span class="kick rv">Your turn</span>
+    <h2 class="h2 rv d1">What does your year look like?</h2>
+    <form class="omni rv d2" data-omni role="search" autocomplete="off">
+      <label class="pre" for="q2">commit.city/</label>
+      <img class="av" alt="" hidden>
+      <input id="q2" type="text" placeholder="your GitHub username" autocapitalize="off" spellcheck="false" aria-label="GitHub user, org or owner/repo">
+      <button class="btn primary go" type="submit">Build<span class="long"> my city</span> <span class="arrow">→</span></button>
+    </form>
+  </div>
+</section>
+</main>
+
+<script type="module">
+const { $, esc, compact, avatarOf, gallery, tile, skeleton } = window.CCSite;
+
+// ── try chips + hero stage tabs
+const TRY = [['sindresorhus', 'person'], ['torvalds', 'person'], ['vercel', 'org'], ['facebook/react', 'repo']];
+$('#try').innerHTML = TRY.map(([t, k]) => `<a class="chip" href="/${t}"><img src="${avatarOf(t.split('/')[0], 48)}" alt="" loading="lazy">${esc(t)}</a>`).join('');
+const STAGE = [
+  { t: 'sindresorhus', label: 'sindresorhus', kind: 'person' },
+  { t: 'vercel', label: 'vercel', kind: 'org' },
+  { t: 'facebook/react', label: 'facebook/react', kind: 'repo' },
+];
+const stage = $('#stage'), poster = $('#poster');
+let cur = -1, live = false;
+const since = new Date(Date.now() - 150 * 86400e3).toISOString().slice(0, 10);   // most of the city already standing
+function show(i) {
+  if (i === cur) return;
+  cur = i;
+  const s = STAGE[i];
+  $('#tabs').querySelectorAll('button').forEach((b, k) => b.setAttribute('aria-selected', String(k === i)));
+  $('#cap').href = $('#openit').href = `/${s.t}`;
+  $('#capt').textContent = `commit.city/${s.t}`;
+  poster.src = `/api/card?t=${encodeURIComponent(s.t)}&layout=sky`;
+  poster.style.opacity = 1;
+  if (live) mount(s);
+}
+function mount(s) {
+  const old = stage.querySelectorAll('iframe');
+  const f = document.createElement('iframe');
+  f.title = `${s.t} as a commit city`;
+  f.src = `/${s.t}#embed=1&hud=0&speed=1d&t=${since}`;
+  f.addEventListener('load', () => setTimeout(() => {
+    if (STAGE[cur].t !== s.t) return f.remove();
+    f.classList.add('on'); poster.style.opacity = 0;
+    setTimeout(() => old.forEach(o => o.remove()), 1200);
+  }, 1500));
+  stage.insertBefore(f, $('#cap'));
+}
+$('#tabs').innerHTML = STAGE.map((s, i) => `<button role="tab" data-i="${i}"><img src="${avatarOf(s.t.split('/')[0], 52)}" alt="">${esc(s.label)} <small>${s.kind}</small></button>`).join('');
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(+b.dataset.i); });
+show(0);
+// the live city loads once the page is idle, on screens big enough and for people who don't mind motion
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const goLive = () => { if (live) return; live = true; mount(STAGE[cur]); };
+if (!calm && matchMedia('(min-width: 700px)').matches) addEventListener('load', () => (window.requestIdleCallback || setTimeout)(goLive, { timeout: 1800 }));
+$('#shield').addEventListener('pointerdown', () => { goLive(); $('#shield').remove(); });
+addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.cc === 'missing') { stage.querySelectorAll('iframe').forEach(f => f.remove()); poster.style.opacity = 1; } });
+
+// ── the URL swap demo
+const PATHS = ['/torvalds', '/vercel', '/facebook/react', '/sindresorhus', '/denoland/deno?all=1', '/you'];
+let pi = 0;
+const bar = $('#urlbar');
+setInterval(() => {
+  if (document.hidden) return;
+  if (!bar.classList.contains('swapped')) { bar.classList.add('swapped'); return; }
+  bar.classList.remove('swapped');
+  pi = (pi + 1) % PATHS.length;
+  setTimeout(() => ($('#urlpath').textContent = PATHS[pi]), 200);
+}, 1700);
+
+// ── the annotated miniature city
+const LANG = [['TS / JS', '#3987e5'], ['Python', '#d95926'], ['Docs', '#199e70'], ['SQL / data', '#c98500'], ['Markup / styles', '#d55181'], ['Config', '#008300'], ['Shell / infra', '#9085e9'], ['Other code', '#e66767'], ['Other files', '#7d7b75']];
+$('#langs').innerHTML = '<span>Tower colour is file type:</span>' + LANG.map(([n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join('');
+const KEYS = [
+  ['island', 'Islands are repos', 'Each one is a treemap of the repo\'s tree. In an org city, repos cluster by owner.', '#2a3751'],
+  ['dir', 'Platforms are directories', 'Stacked by depth, so the shape of the architecture is the shape of the island.', '#3f5278'],
+  ['file', 'Towers are files', 'Height is line count, colour is file type. Footprints stay put, so you can watch one file grow.', '#3987e5'],
+  ['beam', 'Beams are commits', 'Each flies from the author to the repo it lands in, and the files it touched flash.', '#5fd3f3'],
+  ['heat', 'Glow is recent activity', 'Repos cool as they go quiet: hot, active, cooling, dormant, abandoned.', '#8ff0ff'],
+];
+const sw = {
+  island: '<svg viewBox="0 0 20 20"><path d="M10 4l8 4-8 4-8-4z" fill="#2a3751"/><path d="M2 8l8 4v3l-8-4z" fill="#161d2b"/><path d="M18 8l-8 4v3l8-4z" fill="#1c2537"/></svg>',
+  dir: '<svg viewBox="0 0 20 20"><path d="M10 5l7 3.5-7 3.5-7-3.5z" fill="#3f5278"/><path d="M3 8.5l7 3.5v2l-7-3.5z" fill="#232e44"/><path d="M17 8.5l-7 3.5v2l7-3.5z" fill="#2a3751"/></svg>',
+  file: '<svg viewBox="0 0 20 20"><path d="M10 2l4 2-4 2-4-2z" fill="#7fb3f0"/><path d="M6 4l4 2v12l-4-2z" fill="#1f4f8f"/><path d="M14 4l-4 2v12l4-2z" fill="#2d6cbd"/></svg>',
+  beam: '<svg viewBox="0 0 20 20"><path d="M3 17Q10 0 17 12" fill="none" stroke="#5fd3f3" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="12" r="2.2" fill="#c9f6ff"/></svg>',
+  heat: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="#8ff0ff" stroke-width="1.5" opacity=".5"/><circle cx="10" cy="10" r="3.5" fill="#8ff0ff"/></svg>',
+};
+$('#keys').innerHTML = KEYS.map(([k, t, d]) => `<li data-k="${k}"><span class="sw">${sw[k]}</span><div><b>${t}</b><span>${d}</span></div></li>`).join('');
+iso();
+
+function iso() {
+  const svg = $('#iso');
+  const S = 23, OX = 300, OY = 120, C = Math.cos(Math.PI / 6), N = Math.sin(Math.PI / 6);
+  const P = (x, y, z) => [OX + (x - y) * C * S, OY + (x + y) * N * S - z * S];
+  const pts = a => a.map(p => P(...p).map(v => v.toFixed(1)).join(',')).join(' ');
+  const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(Math.min(255, v * f))); return `rgb(${c.join(',')})`; };
+  const box = (x, y, z, w, d, h, col, cls, extra = '') => `<g class="el ${cls}" ${extra}>
+    <polygon points="${pts([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + h], [x, y + d, z + h]])}" fill="${shade(col, 0.55)}"/>
+    <polygon points="${pts([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, z + h], [x + w, y, z + h]])}" fill="${shade(col, 0.78)}"/>
+    <polygon points="${pts([[x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]])}" fill="${shade(col, 1.25)}" stroke="rgba(255,255,255,.18)" stroke-width=".6"/></g>`;
+  // towers: [x, y, height, lang] on two platforms
+  const T = [
+    [1.2, 1.2, 4.6, 0], [2.4, 1.2, 2.2, 0], [3.6, 1.2, 3.1, 0], [1.2, 2.4, 1.4, 4], [2.4, 2.4, 5.6, 0], [3.6, 2.4, 1.8, 6],
+    [1.2, 3.6, 2.6, 2], [2.4, 3.6, 1.1, 2], [3.6, 3.6, 3.8, 0], [1.2, 4.8, 0.9, 5], [2.4, 4.8, 2.9, 7], [3.6, 4.8, 1.3, 5],
+    [6.2, 1.2, 3.4, 1], [7.4, 1.2, 2.0, 1], [6.2, 2.4, 1.5, 3], [7.4, 2.4, 4.2, 1], [6.2, 5.2, 1.0, 8], [7.4, 5.2, 1.7, 2],
+  ];
+  const fz = (x, y) => (x > 5.5 && y < 3.6 ? 0.9 : x < 5 ? 0.9 : 0.55);
+  let t0 = null, focusK = null, hit = 4, hitAt = 0;
+  const grow = new Float32Array(T.length).fill(0);
+  function draw(now) {
+    if (t0 === null) t0 = now;
+    const e = Math.min(1, (now - t0) / 1600);
+    const parts = [];
+    parts.push(`<defs><radialGradient id="ig" cx=".5" cy=".55" r=".55"><stop offset="0" stop-color="#2c8fd6" stop-opacity=".28"/><stop offset="1" stop-color="#2c8fd6" stop-opacity="0"/></radialGradient>
+      <filter id="gl" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs>`);
+    parts.push(`<ellipse cx="300" cy="250" rx="300" ry="150" fill="url(#ig)"/>`);
+    parts.push(box(0, 0, -0.5, 9, 6.8, 0.5, '#2a3751', 'island', 'data-k="island"'));
+    parts.push(box(0.6, 0.6, 0, 4.4, 5.6, 0.45, '#3f5278', 'dir', 'data-k="dir"'));
+    parts.push(box(5.6, 0.6, 0, 2.8, 2.9, 0.45, '#3f5278', 'dir', 'data-k="dir"'));
+    parts.push(box(5.6, 4.6, 0, 2.8, 1.6, 0.2, '#38496b', 'dir', 'data-k="dir"'));
+    const order = T.map((t, i) => i).sort((a, b) => (T[a][0] + T[a][1]) - (T[b][0] + T[b][1]));
+    for (const i of order) {
+      const [x, y, h, l] = T[i];
+      const z = x > 5.5 && y > 4 ? 0.2 : 0.45;
+      const k = Math.min(1, Math.max(0, e * 1.6 - (x + y) / 14));
+      const hh = Math.max(0.05, (h + grow[i]) * (1 - Math.pow(1 - k, 3)));
+      const flash = i === hit ? Math.max(0, 1 - (now - hitAt) / 900) : 0;
+      parts.push(box(x, y, z, 0.8, 0.8, hh, LANG[l][1], 'file', 'data-k="file"'));
+      if (flash > 0) {
+        const [fx, fy] = P(x + 0.4, y + 0.4, z + hh);
+        parts.push(`<circle cx="${fx}" cy="${fy}" r="${6 + 14 * (1 - flash)}" fill="none" stroke="#c9f6ff" stroke-opacity="${flash}" stroke-width="1.5"/>`);
+      }
+    }
+    // heat glow over the busiest platform
+    const [hx, hy] = P(2.8, 3.4, 5);
+    parts.push(`<g class="el heat" data-k="heat"><circle cx="${hx}" cy="${hy}" r="54" fill="#8ff0ff" opacity="${0.05 + 0.03 * Math.sin(now / 600)}" filter="url(#gl)"/><circle cx="${hx}" cy="${hy}" r="22" fill="none" stroke="#8ff0ff" stroke-opacity=".35" stroke-dasharray="2 5"/></g>`);
+    // the author, and a beam to the tower being hit
+    const [ax, ay] = [92, 46];
+    const [tx, ty, , , ] = T[hit];
+    const tz = (tx > 5.5 && ty > 4 ? 0.2 : 0.45) + T[hit][2] + grow[hit];
+    const [bx, by] = P(tx + 0.4, ty + 0.4, tz);
+    const u = Math.min(1, (now - hitAt + 900) / 900);
+    const cx = (ax + bx) / 2, cy = Math.min(ay, by) - 70;
+    const q = (a, b, c, s) => (1 - s) * (1 - s) * a + 2 * (1 - s) * s * b + s * s * c;
+    parts.push(`<g class="el beam" data-k="beam"><path d="M${ax},${ay} Q${cx},${cy} ${bx},${by}" fill="none" stroke="#5fd3f3" stroke-opacity=".35" stroke-width="1.4" stroke-dasharray="3 5"/>
+      <circle cx="${q(ax, cx, bx, u)}" cy="${q(ay, cy, by, u)}" r="4.5" fill="#c9f6ff" filter="url(#gl)"/><circle cx="${q(ax, cx, bx, u)}" cy="${q(ay, cy, by, u)}" r="2.6" fill="#fff"/></g>`);
+    parts.push(`<g class="el avatar" data-k="beam"><circle cx="${ax}" cy="${ay}" r="20" fill="#0b1220" stroke="#5fd3f3" stroke-width="1.6"/><circle cx="${ax}" cy="${ay}" r="26" fill="none" stroke="#5fd3f3" stroke-opacity=".25"/>
+      <path transform="translate(${ax - 10} ${ay - 10}) scale(1.25)" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 014 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z" fill="#cfe8ff"/></g>`);
+    // labels
+    const lab = (x, y, lx, ly, text, k) => `<g class="el" data-k="${k}"><path d="M${x},${y} L${lx},${ly}" stroke="rgba(180,192,211,.35)" stroke-width="1"/><circle cx="${x}" cy="${y}" r="2.5" fill="#b4c0d3"/>
+      <text class="lbl" x="${lx + (lx > x ? 6 : -6)}" y="${ly + 4}" text-anchor="${lx > x ? 'start' : 'end'}">${text}</text></g>`;
+    const [ix, iy] = P(9, 6.8, -0.5), [dx, dy] = P(5.6, 3.5, 0.45), [fx2, fy2] = P(2.8, 2.8, 6.1);
+    parts.push(lab(ix - 40, iy - 18, ix + 30, iy + 6, 'repo', 'island'), lab(dx + 20, dy - 4, 560, dy - 30, 'folder', 'dir'), lab(fx2, fy2, fx2 + 70, fy2 - 26, 'file · 5.6k lines', 'file'));
+    svg.innerHTML = parts.join('');
+    if (focusK) { svg.classList.add('dimmed'); svg.querySelectorAll(`[data-k="${focusK}"]`).forEach(n => n.classList.add('hl')); } else svg.classList.remove('dimmed');
+  }
+  let visible = false, raf = 0;
+  const loop = now => {
+    raf = 0;
+    if (now - hitAt > 2400) {
+      hitAt = now;
+      grow[hit] = Math.min(grow[hit] + 0.35, 2);
+      hit = Math.floor(Math.random() * T.length);
+    }
+    draw(now);
+    if (visible && !document.hidden) raf = requestAnimationFrame(loop);
+  };
+  new IntersectionObserver(es => { visible = es[0].isIntersecting; if (visible && !raf) raf = requestAnimationFrame(loop); }).observe(svg);
+  const setFocus = k => { focusK = k; document.querySelectorAll('#keys li').forEach(li => li.classList.toggle('on', li.dataset.k === k)); if (!raf) draw(performance.now()); };
+  $('#keys').addEventListener('pointerover', e => { const li = e.target.closest('li'); if (li) setFocus(li.dataset.k); });
+  $('#keys').addEventListener('pointerleave', () => setFocus(null));
+  svg.addEventListener('pointerover', e => { const g = e.target.closest('[data-k]'); setFocus(g ? g.dataset.k : null); });
+  svg.addEventListener('pointerleave', () => setFocus(null));
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { t0 = -1e9; draw(performance.now()); }
+}
+
+// ── live sample of GitHub's public timeline
+const pct = x => `${Math.round(x * 100)}%`;
+const KIND = { bot: ['bot', 'var(--bot)'], agent: ['agent', 'var(--agent)'] };
+let queue = [], shown = [], AG = {};
+async function pullLive() {
+  try {
+    const r = await fetch('/api/live');
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    AG = d.agents || {};
+    const n = d.events.length || 1;
+    const c = { h: 0, b: 0, a: 0 };
+    for (const e of d.events) c[e.who === 'bot' ? 'b' : e.who ? 'a' : 'h']++;
+    $('#lv-h').textContent = pct(c.h / n); $('#lv-b').textContent = pct(c.b / n); $('#lv-a').textContent = pct(c.a / n);
+    const sp = $('#lv-split').children; sp[0].style.flexGrow = c.h; sp[1].style.flexGrow = c.b; sp[2].style.flexGrow = c.a;
+    $('#lv-note').textContent = `of the last ${d.events.length} public events`;
+    const fresh = d.events.filter(e => !shown.includes(e.id)).sort((a, b) => a.t - b.t);
+    // agents first: that's the story
+    queue = [...fresh.filter(e => e.who && e.who !== 'bot'), ...fresh.filter(e => !e.who || e.who === 'bot')].slice(0, 40);
+  } catch { $('#lv-note').textContent = 'live sample unavailable right now'; }
+}
+const VERB = { push: 'pushed to', pr: 'opened a PR in', merge: 'merged a PR in', issue: 'opened an issue in', comment: 'commented in', review: 'reviewed a PR in',
+  star: 'starred', fork: 'forked', release: 'released', create: 'created', delete: 'deleted a branch in', public: 'open-sourced' };
+function drip() {
+  const e = queue.shift();
+  if (!e) return;
+  shown.push(e.id); if (shown.length > 400) shown = shown.slice(-200);
+  const feed = $('#feed');
+  const tag = e.who === 'bot' ? `<span class="tg" style="color:var(--bot);border-color:rgba(255,180,84,.4)">bot</span>` :
+    e.who ? `<span class="tg" style="color:${esc(AG[e.who]?.color || 'var(--agent)')};border-color:color-mix(in srgb,currentColor 45%,transparent)">${esc(AG[e.who]?.label || e.who)}</span>` : '<span></span>';
+  const li = document.createElement('li');
+  const verb = e.type === 'pr' ? (e.act === 'opened' ? 'opened a PR in' : e.act === 'closed' ? 'closed a PR in' : 'updated a PR in')
+    : e.type === 'issue' ? (e.act === 'opened' ? 'opened an issue in' : e.act === 'closed' ? 'closed an issue in' : 'updated an issue in') : VERB[e.type] || 'touched';
+  li.innerHTML = `<img src="https://avatars.githubusercontent.com/u/${e.aid}?s=48" alt="" loading="lazy"><span class="tx"><b>${esc(e.actor)}</b> ${verb} <b>${esc(e.repo)}</b></span>${tag}`;
+  feed.prepend(li);
+  while (feed.children.length > 6) feed.lastElementChild.remove();
+}
+const agentsCard = $('#feed');
+new IntersectionObserver((es, io) => {
+  if (!es[0].isIntersecting) return;
+  io.disconnect();
+  pullLive().then(() => { for (let i = 0; i < 4; i++) drip(); });
+  setInterval(() => { if (!document.hidden) drip(); }, 1900);
+  setInterval(() => { if (!document.hidden) pullLive(); }, 30000);
+}, { rootMargin: '200px' }).observe(agentsCard);
+
+// ── gallery tiles + the agent lens examples
+$('#tiles').innerHTML = skeleton(6);
+gallery().then(g => {
+  const list = (g.featured.length ? g.featured : g.all).slice(0, 6);
+  $('#tiles').innerHTML = list.length ? list.map(e => tile(e)).join('') : '<div class="empty">Featured cities appear here once they are built. Build the first one above.</div>';
+  const withWho = g.all.filter(e => typeof e.agent === 'number' && (e.agent > 0 || e.bot > 0)).sort((a, b) => b.agent - a.agent).slice(0, 4);
+  $('#agentlist').hidden = !withWho.length;
+  $('#agentlist').innerHTML = withWho.map(e => {
+    const h = Math.max(0, 1 - e.agent - e.bot);
+    return `<a href="/${esc(e.target)}#lens=agents"><span class="nm">${esc(e.target)}</span><span class="pc">${pct(e.agent)} agent · <span style="color:var(--bot)">${pct(e.bot)} bot</span></span>
+      <div class="split"><span class="h" style="flex-grow:${h}"></span><span class="b" style="flex-grow:${e.bot}"></span><span class="a" style="flex-grow:${e.agent}"></span></div></a>`;
+  }).join('');
+});
+
+// ── the card snippet uses this site's origin (previews and forks work too)
+const me = window.CCSite.me;
+const who = me || 'YOU';
+$('#cardmd').textContent = `[![${who} on commit.city](${location.origin}/api/card?t=${who})](${location.origin}/${who})`;
+if (me) $('#cardimg').src = `/api/card?t=${encodeURIComponent(me)}`;
+</script>

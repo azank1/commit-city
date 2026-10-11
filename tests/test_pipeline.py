@@ -48,12 +48,14 @@ class Repo:
         sh(self.dir, 'git', 'rm', '-q', path)
 
     def commit(self, ts, msg='c', author='Ann', tz='+0000'):
+        """author is a name (email derived from it) or a full `Name <email>`; msg is kept verbatim."""
         sh(self.dir, 'git', 'add', '-A')
         stamp = f'{ts} {tz}'
-        env = {'GIT_AUTHOR_DATE': stamp, 'GIT_COMMITTER_DATE': stamp, 'GIT_AUTHOR_NAME': author,
-               'GIT_AUTHOR_EMAIL': f'{author.lower()}@x.test', 'GIT_COMMITTER_NAME': author,
-               'GIT_COMMITTER_EMAIL': f'{author.lower()}@x.test'}
-        sh(self.dir, 'git', 'commit', '-q', '--allow-empty', '-m', msg, env=env)
+        name, email = (author.split(' <', 1)[0], author.split(' <', 1)[1].rstrip('>')) if ' <' in author \
+            else (author, f'{author.lower()}@x.test')
+        env = {'GIT_AUTHOR_DATE': stamp, 'GIT_COMMITTER_DATE': stamp, 'GIT_AUTHOR_NAME': name,
+               'GIT_AUTHOR_EMAIL': email, 'GIT_COMMITTER_NAME': name, 'GIT_COMMITTER_EMAIL': email}
+        sh(self.dir, 'git', 'commit', '-q', '--allow-empty', '--cleanup=verbatim', '-m', msg, env=env)
         return sh(self.dir, 'git', 'rev-parse', 'HEAD').strip()
 
     def head_state(self, keep):
