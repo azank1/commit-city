@@ -9,7 +9,7 @@ export interface PutOptions { contentType: string; maxAge?: number; overwrite?: 
 export interface Listed { pathname: string; uploadedAt: Date; size: number }
 
 export interface Store {
-  get(pathname: string, fresh?: boolean): Promise<Buffer | null>;
+  get(pathname: string): Promise<Buffer | null>;
   exists(pathname: string): Promise<boolean>;
   put(pathname: string, data: Buffer, o: PutOptions): Promise<string>;
   url(pathname: string): string;
@@ -28,16 +28,7 @@ class BlobStore implements Store {
   constructor(storeId: string) {
     this.base = `https://${storeId.toLowerCase()}.public.blob.vercel-storage.com`;
   }
-  async get(pathname: string, fresh = false) {
-    if (fresh) {
-      // the SDK's useCache: false only reaches private blobs; for a public one it was silently ignored, so the
-      // read-modify-writes behind gallery/recent.json lost entries. A unique query string makes the CDN go back
-      // to the store. Errors other than 404 throw: an owner's `hidden` setting must not read as "no settings".
-      const r = await fetch(`${this.url(pathname)}?fresh=${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, { cache: 'no-store' });
-      if (r.status === 404) return null;
-      if (!r.ok) throw new Error(`blob ${pathname}: HTTP ${r.status}`);
-      return Buffer.from(await r.arrayBuffer());
-    }
+  async get(pathname: string) {
     const r = await blobGet(pathname, { access: 'public' });
     if (!r || r.statusCode !== 200) return null;
     return readStream(r.stream);
@@ -114,8 +105,13 @@ export function getStore(): Store {
 }
 export function setStore(s: Store) { store = s; }
 
+// The CDN in front of a public store serves an overwritten blob's old contents for up to its max-age, whatever
+// the query string, and the SDK's useCache: false only reaches private blobs. So `fresh` here is fresh
+// existence only (head goes to the store, not the CDN): enough to see a deletion. Anything read, modified and
+// written again goes through the versioned documents below instead.
 export async function getJSON<T>(pathname: string, fresh = false): Promise<T | null> {
-  const b = await getStore().get(pathname, fresh);
+  if (fresh && !(await getStore().exists(pathname))) return null;
+  const b = await getStore().get(pathname);
   if (!b) return null;
   return JSON.parse((pathname.endsWith('.gz') ? gunzipSync(b) : b).toString('utf8')) as T;
 }
@@ -126,4 +122,37 @@ export async function putJSON(pathname: string, value: unknown, o: { maxAge?: nu
   return getStore().put(pathname, gz ? gzipSync(text, { level: 6 }) : text, {
     contentType: gz ? 'application/gzip' : 'application/json', maxAge: o.maxAge, overwrite: o.overwrite,
   });
+}
+
+// Versioned documents: every write is a new, never-overwritten pathname under `dir`, named so the newest sorts
+// first, and a read lists `dir` (a listing comes from the store, never from the CDN) and fetches what it names
+// (immutable, so a cached copy is the right one). Two writers racing each leave a version; readers that merge
+// the newest few lose neither.
+const SPAN = 1e13;                                  // ms; inverted times stay 13 digits until the year 2286
+
+let last = 0;
+export function versionName(now = Date.now()) {
+  last = Math.max(now, last + 1);                   // two writes in one millisecond still sort in order
+  return `${String(SPAN - last).padStart(13, '0')}-${Math.random().toString(36).slice(2, 8)}.json`;
+}
+
+/** Pathnames of the versions under `dir` (ending in /), newest first. */
+export async function listVersions(dir: string): Promise<string[]> {
+  const names = (await getStore().list(dir, 100)).map(b => b.pathname).filter(p => p.endsWith('.json'));
+  return names.sort();
+}
+
+/** The newest `n` versions under `dir`, newest first; one deleted between the listing and the read is skipped.
+ *  Any other failure throws: an owner's `hidden` must never read as "no settings". */
+export async function readVersions<T>(dir: string, n: number, names?: string[]): Promise<T[]> {
+  const top = (names ?? (await listVersions(dir))).slice(0, n);
+  const docs = await Promise.all(top.map(p => getJSON<T>(p)));
+  return docs.filter((d): d is NonNullable<typeof d> => d !== null) as T[];
+}
+
+/** Write a new version under `dir` and delete all but the newest `keep` (counting the new one). */
+export async function writeVersion(dir: string, value: unknown, keep: number, names?: string[]): Promise<void> {
+  const before = names ?? (await listVersions(dir));
+  await putJSON(dir + versionName(), value);
+  await Promise.all(before.slice(Math.max(0, keep - 1)).map(p => getStore().del(p).catch(() => {})));
 }

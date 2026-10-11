@@ -4,7 +4,9 @@ import { after, test } from 'node:test';
 import { tmpdir } from './helpers';
 
 process.env.LOCAL_STORE_DIR = tmpdir('cc-city-');
-const { startBuild } = await import('../lib/city');
+const { addToGallery, readGallery, readSettings, startBuild, writeSettings } = await import('../lib/city');
+const { listVersions, putJSON } = await import('../lib/store');
+type CityMeta = import('../lib/city').CityMeta;
 const { HttpError } = await import('../lib/http');
 
 const realFetch = globalThis.fetch;
@@ -44,4 +46,60 @@ test('a repo within the limit starts a build', async () => {
   const st = await startBuild({ kind: 'repo', owner: 'torvalds', name: 'linux' }, 'token');
   assert.equal(st.repos.length, 1);
   assert.equal(st.skipped.length, 0);
+});
+
+/** The meta of a built city, as much of it as the gallery reads. */
+function meta(key: string, v: number): CityMeta {
+  return {
+    v, key, target: key, kind: key.includes('/') ? 'repo' : 'user', url: `https://blob.example/${key}/${v}.json.gz`, generated: '', login: key.split('/')[0],
+    name: key, avatar: '', repos: 1, commits: 10, files: 1, lines: 100, window_start: '', top: [], langs: [], who: { human: 10, bot: 0, agent: 0, agents: [] },
+  };
+}
+
+test('the list written before versions is read, and carried into the first version', async () => {
+  await putJSON('gallery/recent.json', [{ ...meta('old', 1), agent: 0, bot: 0 }].map(({ key, target, kind, avatar, commits, repos, lines, v }) =>
+    ({ key, target, kind, avatar, commits, repos, lines, v, agent: 0, bot: 0 })), { overwrite: true });
+  assert.deepEqual((await readGallery()).map(e => e.key), ['old']);
+  await addToGallery(meta('first', 500));
+  assert.deepEqual((await readGallery()).map(e => e.key), ['first', 'old']);
+  assert.equal((await listVersions('gallery/recent/')).length, 1);
+});
+
+test('cities built at the same moment all reach the gallery', async () => {
+  await Promise.all(['ada', 'grace', 'linus', 'ken/unix'].map((k, i) => addToGallery(meta(k, 1000 + i))));
+  assert.deepEqual((await readGallery()).map(e => e.key).slice(0, 4), ['ken/unix', 'linus', 'grace', 'ada']);
+});
+
+test('a rebuilt city moves to the front once, and old versions are pruned', async () => {
+  for (let i = 0; i < 12; i++) await addToGallery(meta(`user${i}`, 2000 + i));
+  await addToGallery(meta('ada', 3000));
+  const keys = (await readGallery()).map(e => e.key);
+  assert.equal(keys[0], 'ada');
+  assert.equal(keys.filter(k => k === 'ada').length, 1);
+  assert.ok(keys.includes('ken/unix') && keys.includes('user0'));
+  assert.ok((await listVersions('gallery/recent/')).length <= 8);
+});
+
+test('a hidden owner leaves the gallery, repo cities too, and stays out', async () => {
+  await writeSettings('ken', { hidden: true });
+  const keys = (await readGallery()).map(e => e.key);
+  assert.ok(!keys.includes('ken/unix'));
+  assert.ok(keys.includes('ada') && keys.includes('linus'));
+  await addToGallery(meta('grace', 4000));
+  assert.ok(!(await readGallery()).some(e => e.key.startsWith('ken')));
+});
+
+test('a fresh settings read sees the latest write; a plain one reads the CDN copy', async () => {
+  await writeSettings('ada', { exclude: ['ada/old'] });
+  await writeSettings('ada', { exclude: ['ada/new'] });
+  assert.deepEqual((await readSettings('ada', true)).exclude, ['ada/new']);
+  await putJSON('settings/ada.json', { exclude: ['ada/cdn'] }, { overwrite: true });   // what a stale edge would serve
+  assert.deepEqual((await readSettings('ada')).exclude, ['ada/cdn']);
+  assert.deepEqual((await readSettings('ada', true)).exclude, ['ada/new']);
+  assert.equal((await listVersions('settings/ada/')).length, 2);
+});
+
+test('a hidden owner cannot be rebuilt, however stale the CDN copy', async () => {
+  await putJSON('settings/ken.json', {}, { overwrite: true });
+  await assert.rejects(startBuild({ kind: 'owner', login: 'ken' }, 'token'), (e: unknown) => e instanceof HttpError && e.status === 403);
 });
