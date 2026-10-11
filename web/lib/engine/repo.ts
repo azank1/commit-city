@@ -15,6 +15,7 @@ export interface ReplayOptions {
   transport?: Transport;        // tests inject a local upload-pack
   maxPackBytes?: number;
   timeoutMs?: number;
+  maxRssBytes?: number;         // stop with too_big past this resident size (the instance's memory is shared)
   blobLimit?: number;           // blobs at least this big are fetched only when the replay needs them (0 = all)
   log?: (msg: string) => void;
 }
@@ -25,6 +26,7 @@ const MAX_CHAIN_ROUNDS = 40;
 const MAX_SIDE_PARENTS = 400;
 const BLOB_LIMIT = 128 * 1024;
 const BLOBS_PER_FETCH = 4000;
+const MAX_RSS = 1.5e9;          // functions get 2 GB, and concurrent builds on one instance share it
 
 export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord; stats: ReplayStats }> {
   const t0 = Date.now();
@@ -32,6 +34,15 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
   const maxBytes = o.maxPackBytes ?? 350e6;
   const deadline = t0 + (o.timeoutMs ?? 200_000);
   const db = new ObjectDB();
+  // Indexing a pack and replaying it are synchronous and can run for minutes on a big repo, so the deadline
+  // is checked inside them too, not only between fetches: past it, the platform kills the function at 300 s
+  // (or the instance runs out of memory) and the visitor gets a bare 500 after a five-minute wait.
+  const maxRss = o.maxRssBytes ?? MAX_RSS;
+  const guard = () => {
+    if (Date.now() > deadline) throw new GitError('replay ran out of time', 'timeout');
+    if (process.memoryUsage.rss() > maxRss) throw new GitError('replay needs more memory than the hosted builder has', 'too_big');
+  };
+  db.guard = guard;
   const shallow = new Set<string>();
   const limit = o.blobLimit ?? BLOB_LIMIT;
   const filter = limit > 0 ? `blob:limit=${limit}` : undefined;
@@ -72,6 +83,7 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
 
   // HEAD's .gitattributes are the only file contents the replay reads; after that the packs can go
   const rp = new Replayer(db, makeKeep());
+  rp.guard = guard;
   const headCommit = db.commits.get(o.head);
   if (headCommit) {
     const held = rp.missingAttributes(headCommit.tree);

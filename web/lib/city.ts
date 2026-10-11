@@ -149,7 +149,7 @@ export async function buildRepo(ticketToken: string, name: string) {
     return { cached: false, files: record.files.length, commits: record.commits.length, ms: stats.ms, mb: Math.round(stats.packBytes / 1e5) / 10, partial: record.partial };
   } catch (e) {
     if (e instanceof GitError) {
-      const reason = e.code === 'too_big' ? 'too big for the hosted builder' : e.code === 'timeout' ? 'took too long to fetch'
+      const reason = e.code === 'too_big' ? 'too big for the hosted builder' : e.code === 'timeout' ? 'took too long to replay'
         : e.code === 'not_found' ? 'not readable' : `fetch failed (${e.message.slice(0, 120)})`;
       throw new HttpError(422, reason, { status: 'repo_failed' });
     }
