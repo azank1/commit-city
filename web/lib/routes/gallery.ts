@@ -3,7 +3,7 @@ import { GALLERY, type GalleryEntry, readMeta } from '../city.js';
 import { handle, json } from '../http.js';
 import { getJSON } from '../store.js';
 
-const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'facebook/react', 'denoland/deno', 'gaearon', 'tj', 'rust-lang/rust', 'withastro', 'antfu'];
+const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'facebook/react', 'denoland/deno', 'gaearon', 'karpathy', 'rust-lang/rust', 'withastro', 'antfu'];
 
 export const GET = handle(async () => {
   const [recent, metas] = await Promise.all([

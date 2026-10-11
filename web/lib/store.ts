@@ -29,7 +29,16 @@ class BlobStore implements Store {
     this.base = `https://${storeId.toLowerCase()}.public.blob.vercel-storage.com`;
   }
   async get(pathname: string, fresh = false) {
-    const r = await blobGet(pathname, { access: 'public', useCache: !fresh });
+    if (fresh) {
+      // the SDK's useCache: false only reaches private blobs; for a public one it was silently ignored, so the
+      // read-modify-writes behind gallery/recent.json lost entries. A unique query string makes the CDN go back
+      // to the store. Errors other than 404 throw: an owner's `hidden` setting must not read as "no settings".
+      const r = await fetch(`${this.url(pathname)}?fresh=${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, { cache: 'no-store' });
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error(`blob ${pathname}: HTTP ${r.status}`);
+      return Buffer.from(await r.arrayBuffer());
+    }
+    const r = await blobGet(pathname, { access: 'public' });
     if (!r || r.statusCode !== 200) return null;
     return readStream(r.stream);
   }
