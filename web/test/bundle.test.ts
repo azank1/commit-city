@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { finishBuild, GALLERY, type GalleryEntry, repoPath } from '../lib/city';
+import { finishBuild, readGallery, repoPath } from '../lib/city';
 import { aggregate, budgetCaps, bundle, mergeEvents, mineOf } from '../lib/engine/bundle';
 import { replayRepo } from '../lib/engine/repo';
 import type { RepoRecord } from '../lib/engine/replay';
@@ -131,7 +131,7 @@ test('finish step: records of another version are never drawn; meta and gallery 
   assert.equal(meta.repos, 1);
   assert.equal(meta.commits, 7);                                    // k = 2..8, everyone's
   assert.deepEqual(meta.who, { human: 1, bot: 1, agent: 5, agents: [['claude', 2], ['copilot', 2], ['cursor', 1]] });
-  const gallery = (await getJSON<GalleryEntry[]>(GALLERY))!;
+  const gallery = await readGallery();
   assert.deepEqual([gallery[0].agent, gallery[0].bot], [0.714, 0.143]);
   const payload = (await getJSON<{ who: string[]; totals: { omitted_repos: number; omitted_commits: number } }>(`cities/me/${meta.v}.json.gz`))!;
   assert.deepEqual(payload.who, ['human', 'bot', 'claude', 'copilot', 'cursor']);

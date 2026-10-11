@@ -7,7 +7,7 @@ import { replayRepo } from './engine/repo.js';
 import { HttpError } from './http.js';
 import { sign, verify } from './secret.js';
 import { type Sky, skyline } from './skyline.js';
-import { getJSON, getStore, putJSON } from './store.js';
+import { getJSON, getStore, listVersions, putJSON, readVersions, writeVersion } from './store.js';
 import { cityKey } from './target.js';
 
 // the record version is part of the key, so records of an older shape are cache misses and get replayed again
@@ -15,7 +15,8 @@ export const repoPath = (name: string, head: string, whole: boolean) =>
   `repos/${name.toLowerCase()}/${head}${whole ? '.all' : ''}.v${RECORD_VERSION}.json.gz`;
 export const metaPath = (key: string) => `meta/${key}.json`;
 export const cityPath = (key: string, v: number) => `cities/${key}/${v}.json.gz`;
-export const settingsPath = (login: string) => `settings/${login.toLowerCase()}.json`;
+export const settingsPath = (login: string) => `settings/${login.toLowerCase()}.json`;       // the CDN copy
+export const settingsDir = (login: string) => `settings/${login.toLowerCase()}/`;            // its versions
 export const skyPath = (key: string, v: number) => `sky/${key}/${v}.json`;
 
 export interface CityMeta {
@@ -47,8 +48,11 @@ export interface GalleryEntry {
   key: string; target: string; kind: CityMeta['kind']; avatar: string; commits: number; repos: number; lines: number; v: number;
   agent: number; bot: number;     // shares of the commits, 0..1 to 3 decimals
 }
-export const GALLERY = 'gallery/recent.json';
+export const GALLERY = 'gallery/recent.json';    // the single overwritten list, before versions; read as a fallback
+export const GALLERY_DIR = 'gallery/recent/';
 const GALLERY_MAX = 60;
+const GALLERY_MERGE = 4;                          // versions a read merges: concurrent builds each write one
+const GALLERY_KEEP = 8;
 
 export interface Settings { hidden?: boolean; exclude?: string[]; updated?: string }
 
@@ -67,12 +71,20 @@ const DAY = 86400;
 // reuses it: a newer account's window starts later, and extra history before the window is harmless.
 export const replayStart = (now: number) => Math.floor((now - 365 * DAY) / DAY) * DAY;
 
+// Settings are read fresh where acting on a stale `hidden` would be wrong (starting a build, the owner's own
+// settings page): from the newest version. Pages and cards read the CDN copy, at most a minute old.
 export async function readSettings(login: string, fresh = false): Promise<Settings> {
-  return (await getJSON<Settings>(settingsPath(login), fresh)) ?? {};
+  if (fresh) {
+    const [latest] = await readVersions<Settings>(settingsDir(login), 1);
+    if (latest) return latest;
+  }
+  return (await getJSON<Settings>(settingsPath(login))) ?? {};
 }
 
 export async function writeSettings(login: string, s: Settings): Promise<void> {
-  await putJSON(settingsPath(login), { ...s, updated: new Date().toISOString() }, { overwrite: true, maxAge: 60 });
+  const doc = { ...s, updated: new Date().toISOString() };
+  await writeVersion(settingsDir(login), doc, 2);
+  await putJSON(settingsPath(login), doc, { overwrite: true, maxAge: 60 });
   if (s.hidden) await dropCities(login);
 }
 
@@ -187,10 +199,19 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
   return meta;
 }
 
-async function addToGallery(m: CityMeta) {
-  const list = (await getJSON<GalleryEntry[]>(GALLERY, true)) ?? [];
-  const next = [galleryEntry(m), ...list.filter(e => e.key !== m.key)].slice(0, GALLERY_MAX);
-  await putJSON(GALLERY, next, { overwrite: true, maxAge: 60 });
+/** The most recently built cities, newest first: the newest versions merged, each city once at its latest build. */
+export async function readGallery(names?: string[]): Promise<GalleryEntry[]> {
+  names ??= await listVersions(GALLERY_DIR);
+  const lists = names.length ? await readVersions<GalleryEntry[]>(GALLERY_DIR, GALLERY_MERGE, names) : [(await getJSON<GalleryEntry[]>(GALLERY)) ?? []];
+  const latest = new Map<string, GalleryEntry>();
+  for (const e of lists.flat()) if ((latest.get(e.key)?.v ?? -1) < e.v) latest.set(e.key, e);
+  return [...latest.values()].sort((a, b) => b.v - a.v).slice(0, GALLERY_MAX);
+}
+
+export async function addToGallery(m: CityMeta) {
+  const names = await listVersions(GALLERY_DIR);
+  const next = [galleryEntry(m), ...(await readGallery(names)).filter(e => e.key !== m.key)].slice(0, GALLERY_MAX);
+  await writeVersion(GALLERY_DIR, next, GALLERY_KEEP, names);
 }
 
 const share = (n: number, total: number) => (total ? Math.round((1000 * n) / total) / 1000 : 0);
@@ -203,10 +224,12 @@ export function galleryEntry(m: CityMeta): GalleryEntry {
 }
 
 export async function removeFromGallery(owner: string) {
-  const list = (await getJSON<GalleryEntry[]>(GALLERY, true)) ?? [];
+  const names = await listVersions(GALLERY_DIR);
+  const list = await readGallery(names);
   const o = owner.toLowerCase();
   const next = list.filter(e => e.key !== o && !e.key.startsWith(o + '/'));
-  if (next.length !== list.length) await putJSON(GALLERY, next, { overwrite: true, maxAge: 60 });
+  // keep no older version: a read merging it would bring the owner's cities back
+  if (next.length !== list.length) await writeVersion(GALLERY_DIR, next, 1, names);
 }
 
 export function summarize(payload: Payload, base: Pick<CityMeta, 'v' | 'key' | 'target' | 'kind' | 'url'>): CityMeta {

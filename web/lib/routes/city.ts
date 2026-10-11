@@ -9,7 +9,7 @@ export const GET = handle(async req => {
   const key = cityKey(target, wantsWhole(u.searchParams.get('all')));
   const fresh = u.searchParams.has('fresh');
   const owner = target.kind === 'owner' ? target.login : target.owner;
-  const [meta, settings] = await Promise.all([readMeta(key, fresh), readSettings(owner)]);
+  const [meta, settings] = await Promise.all([readMeta(key, fresh), readSettings(owner, fresh)]);
   if (settings.hidden) return json({ status: 'hidden' }, 200, fresh ? {} : { 'Cache-Control': 'public, s-maxage=60' });
   const m = meta ?? (fresh ? null : await readMeta(key, true));
   if (!m) return json({ status: 'missing' });

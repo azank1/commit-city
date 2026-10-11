@@ -1,13 +1,12 @@
 // Cities for the landing page: a hand-picked few, and the most recently built.
-import { GALLERY, type GalleryEntry, readMeta } from '../city.js';
+import { type GalleryEntry, readGallery, readMeta } from '../city.js';
 import { handle, json } from '../http.js';
-import { getJSON } from '../store.js';
 
 const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'facebook/react', 'denoland/deno', 'gaearon', 'karpathy', 'rust-lang/rust', 'withastro', 'antfu'];
 
 export const GET = handle(async () => {
   const [recent, metas] = await Promise.all([
-    getJSON<GalleryEntry[]>(GALLERY).catch(() => null),
+    readGallery().catch(e => { console.error('gallery', e); return null; }),
     Promise.all(FEATURED.map(k => readMeta(k).catch(() => null))),
   ]);
   const featured: GalleryEntry[] = metas.filter(m => m !== null).map(m => ({
