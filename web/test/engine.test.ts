@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from 'node:test';
+import { GitError } from '../lib/engine/git';
 import { replayRepo } from '../lib/engine/repo';
 import type { RepoRecord } from '../lib/engine/replay';
 import { localTransport, pythonReplay, Repo, tmpdir } from './helpers';
@@ -200,4 +201,12 @@ test('a merge of a branch older than the window does not cut the chain short', a
   const feat1 = record.commits.find(c => c[1] === Math.floor((T0 + 13 * DAY) / 60))!;
   assert.ok(feat1[4] > 0, 'the first commit of a branch forked before the window still knows its files');
   assert.ok(stats.fetches <= 6, `fetches ${stats.fetches}`);
+});
+
+test('a replay that outgrows its memory stops with too_big instead of taking the instance down', async () => {
+  const root = tmpdir();
+  const r = scenario(path.join(root, 'repo'));
+  // any real process is over 1 byte: the guard inside the replay loop must fire after the fetch succeeded
+  await assert.rejects(replayRepo({ repo: 'test/repo', head: r.head(), start: 0, transport: localTransport(r.bare()), maxRssBytes: 1 }),
+    (e: unknown) => e instanceof GitError && e.code === 'too_big' && /memory/.test(e.message));
 });

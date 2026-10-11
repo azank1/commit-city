@@ -28,6 +28,8 @@ export class ObjectDB {
   blobs = new Map<string, BlobInfo>();
   objects = 0;
   packBytes = 0;
+  /** Called every 1024 objects while a pack is indexed; throws to stop a build that is out of time or memory. */
+  guard: (() => void) | null = null;
   private locs = new Map<string, Loc>();      // where each object lives, to read one again later
   private keepLocs = true;
 
@@ -115,7 +117,7 @@ export class ObjectDB {
     h.update(`${TYPE_NAME[type]} ${data.length}\0`);
     h.update(data);
     const sha = h.digest('hex');
-    this.objects++;
+    if ((++this.objects & 1023) === 0) this.guard?.();
     if (type === 1) this.commits.set(sha, parseCommit(sha, data));
     else if (type === 2) this.trees.set(sha, data);
     else if (type === 3) this.blobs.set(sha, blobInfo(data));

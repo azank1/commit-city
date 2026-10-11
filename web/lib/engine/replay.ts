@@ -34,6 +34,8 @@ export class Replayer {
   private attrsLoaded = false;
   /** While set, blobs a partial fetch left out are collected here instead of failing the replay. */
   collect: Set<string> | null = null;
+  /** Called once per commit replayed; throws to stop a build that is out of time or memory. */
+  guard: (() => void) | null = null;
   constructor(private db: ObjectDB, private keep: Keep) {}
 
   /** Read every .gitattributes in a tree (git applies HEAD's to all commits of a bare repo). */
@@ -158,6 +160,7 @@ export class Replayer {
     let prevTree: string | null = base ? base.tree : null;
     for (let i = chain.length - 1; i >= 0; i--) {
       const c = chain[i];
+      this.guard?.();
       const t = Math.max(Math.floor(c.ct / 60), lastT);       // monotonic landing clock
       lastT = t;
       const changes = this.diff(prevTree, c.tree);
@@ -183,6 +186,7 @@ export class Replayer {
     const inWindow = [...this.db.commits.values()].filter(c => c !== base && c.ct > start);
     inWindow.sort((a, b) => b.at - a.at);
     for (const c of inWindow.slice(0, MAX_COMMITS)) {
+      this.guard?.();
       let changes = touches.get(c.sha);
       if (!changes) {
         const p = c.parents[0];
