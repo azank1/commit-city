@@ -933,7 +933,8 @@ const el = {
   const tot = DATA.totals || {};
   const bits = [];
   if (tot.contributions != null) bits.push(`GitHub shows ${fmtInt(tot.contributions)} contributions since ${tot.window_start}; it also counts PRs, issues, reviews and private activity. Buildings show default-branch commits.`);
-  if (tot.omitted_repos) bits.push(`${tot.omitted_repos} smaller repos (${fmtInt(tot.omitted_commits)} commits) left out.`);
+  // omitted = repos past the busiest-N cap *and* repos too big to replay (torvalds/linux), so no "smaller"
+  if (tot.omitted_repos) bits.push(`${tot.omitted_repos} more ${tot.omitted_repos === 1 ? 'repo' : 'repos'} (${fmtInt(tot.omitted_commits)} commits) not drawn: the very largest are skipped, and only the busiest are shown.`);
   if (!PERSONAL) {
     for (const [sel, text] of [['#f-commits + label', 'commits'], ['.side-head span', 'repos · commits so far'], ['.tick-labels span:nth-child(2)', 'commits per hour']]) {
       const n = document.querySelector(sel); if (n) n.textContent = text;

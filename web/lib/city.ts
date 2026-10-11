@@ -111,6 +111,12 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
   }
   const excluded = new Set((settings.exclude ?? []).map(s => s.toLowerCase()));
   const repos = d.repos.filter(r => !excluded.has(r.name.toLowerCase()));
+  // nothing left to replay because it is all too big (torvalds/linux, vercel/next.js): say so now, instead of
+  // letting finish() report "no commits in the last year" for a repo with tens of thousands of them
+  const big = d.skipped.filter(s => /too big/.test(s.reason));
+  if (!repos.length && big.length) {
+    throw new HttpError(422, `${big[0].name} is too big for the hosted builder`, { status: 'too_big', skipped: big.slice(0, 5) });
+  }
   const cached = await Promise.all(repos.map(r => exists(repoPath(r.name, r.head, whole))));
   const ticket: Ticket = { k: key, t: d.target, s: whole ? 0 : Math.min(d.start, replayStart(d.now)), w: whole, r: repos.map(r => [r.name, r.head, r.headTime]) };
   const plan: Plan = {
