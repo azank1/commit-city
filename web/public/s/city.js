@@ -220,6 +220,15 @@
         Sign in with GitHub and the build runs on your own quota instead. Sign-in asks for no permissions: public data only.</p>
         <div class="cc-actions"><a class="cc-primary" href="${signInUrl()}">${GH}Sign in with GitHub</a><button id="cc-retry">Try again</button></div>${foot}`), wireRetry();
     }
+    if (s === 'too_big') {
+      tellParent('missing');
+      const big = (info.skipped || [])[0] || {};
+      const owner = isRepo ? CC.target.split('/')[0] : '';
+      return show(`${head('commit.city', CC.target)}<p class="cc-sub"><b>${esc(big.name || CC.target)}</b> is ${esc(big.reason || 'too big for the hosted builder')}.
+        Replaying ${big.commits ? `its ${fmt(big.commits)} commits from the last year` : 'its history'} would run past what one build may take;
+        for now the hosted builder takes repos up to about 1.5 GB.</p>
+        <div class="cc-actions">${owner ? `<a class="cc-primary" href="/${esc(owner)}">See ${esc(owner)}'s city</a>` : ''}<a href="/explore">Explore other cities</a></div>${foot}`);
+    }
     if (s === 'empty') {
       const whole = isRepo && !CC.all;
       return show(`${head('commit.city', CC.target)}<p class="cc-sub">${esc(e.message)}.
