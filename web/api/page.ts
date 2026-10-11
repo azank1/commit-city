@@ -59,6 +59,7 @@ ${VIEWER_BODY}
 <script id="lapse-data" type="application/json"></script>
 <nav id="cc-bar" aria-label="commit.city">
   <a class="cc-brand" href="/" title="commit.city home"><span class="cc-logo" aria-hidden="true"></span><span class="cc-wm">commit<span>.city</span></span></a>
+  <a class="cc-link" href="/explore">Explore</a><a class="cc-link" href="/events"><i class="cc-live"></i>Live</a>
   <form id="cc-go" class="cc-go" role="search"><label for="cc-q" class="cc-sr">GitHub user, org or owner/repo</label><input id="cc-q" placeholder="any GitHub user or owner/repo" autocomplete="off" spellcheck="false"><button aria-label="Open city">→</button></form>
   <span id="cc-age" class="cc-age" hidden></span>
   <button id="cc-share" class="cc-btn cc-primary" hidden>Share</button>

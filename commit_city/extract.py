@@ -2,8 +2,8 @@
 
 Per repo: bare single-branch clone, take the file state at the window start in one pass
 (numstat against the empty tree), replay first-parent commits from there to HEAD, record
-which files each of your commits touched, then delete the clone. Times are absolute unix
-minutes; bundle.py makes them relative.
+which files each of your commits touched and who wrote it (a human, a bot or an AI agent: see
+agents.py), then delete the clone. Times are absolute unix minutes; bundle.py makes them relative.
 """
 import base64
 import concurrent.futures as cf
@@ -15,8 +15,11 @@ import subprocess
 import time
 from collections import defaultdict
 
+from . import agents
+
 EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 BINARY_SIZE = 12          # a binary file stands in as a 12-line file
+RECORD_VERSION = 2        # bump when records change shape: cached records of another version are re-extracted
 MIN_FREE_GB = 1.0
 
 # language classes, in palette-slot order; 'Other files' is the fallback
@@ -104,6 +107,18 @@ def remote_head(url, token):
 
 
 LOG_FMT = '--format=@%H %ct %at %ad'
+WHO_FMT = '--format=%H%x00%an <%ae>%x00%B%x00'        # NUL-separated: a message can hold any other byte
+
+
+def who_of(dest, shas):
+    """{sha: '' | 'bot' | agent id} for these commits, from their author and raw message (agents.classify)."""
+    # bytes, decoded here: text mode would turn a lone CR into a line break the hosted builder does not see
+    r = subprocess.run(['git', '-C', dest, *GIT_CONFIG, 'log', '--no-walk=unsorted', '--stdin', '--no-use-mailmap',
+                        WHO_FMT], input=('\n'.join(shas) + '\n').encode(), capture_output=True)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.decode('utf-8', 'replace').strip()[:400])
+    f = r.stdout.decode('utf-8', 'replace').split('\0')    # [sha, author, message, '\n' + sha, ...]
+    return {f[i].strip(): agents.classify(f[i + 1], f[i + 2]) for i in range(0, len(f) - 2, 3)}
 
 
 def parse_log(text):
@@ -187,12 +202,13 @@ def replay(dest, start, my_shas, keep, table):
     if my_shas:
         mlog = git(dest, 'log', '--no-walk=unsorted', '--stdin', '--no-renames',
                    '--diff-merges=first-parent', '--raw', LOG_FMT, '--date=format:%z', stdin='\n'.join(my_shas) + '\n')
+        who = who_of(dest, my_shas)
         for sha, ct, at, off, raw, num in parse_log(mlog):
             files = sorted({index[p] for _, p in raw if p in index})
-            mine.append([at // 60, off, len(files), files[:300], sha[:12]])
+            mine.append([at // 60, off, len(files), files[:300], sha[:12], who[sha]])
         mine.sort()
     head = git(dest, 'rev-parse', 'HEAD').strip()
-    return {'head': head, 'fp_commits': n_fp, 'base_t': base_t,
+    return {'v': RECORD_VERSION, 'head': head, 'fp_commits': n_fp, 'base_t': base_t,
             'files': [[p, lang_of(p, table), events[p]] for p in paths], 'mine': mine}
 
 
@@ -206,11 +222,12 @@ def process(name, meta, start, cfg, cache, token, log):
     url = meta['clone_url']
     wanted = {s[:12] for s in meta['shas']}
     if os.path.exists(out_path):
-        # reusable while HEAD has not moved, the window did not grow backwards, and no new commits of yours
-        # appeared; commits that slid out of the window are dropped later, in bundle
+        # reusable while it has this record shape, HEAD has not moved, the window did not grow backwards, and no
+        # new commits of yours appeared; commits that slid out of the window are dropped later, in bundle
         with open(out_path) as f:
             old = json.load(f)
-        if (old.get('head') and old.get('start', 1 << 62) <= start and wanted <= set(old.get('requested', []))
+        if (old.get('v') == RECORD_VERSION and old.get('head') and old.get('start', 1 << 62) <= start
+                and wanted <= set(old.get('requested', []))
                 and old['head'] == remote_head(url, token if meta.get('private') else None)):
             return f'{name:45s} unchanged'
     if meta.get('size_kb', 0) / 1024 > cfg.max_clone_mb:

@@ -7,6 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { layoutRepo, placeIslands, heightOf, STEP_H, BASE_H } from './layout.js';
 import * as SH from './shaders.js';
+import { agents as AGENT_RULES } from '../../schema/agents.json';
 
 // ───────────────────────────────────────────────────────────── constants
 const $ = id => document.getElementById(id);
@@ -16,6 +17,14 @@ const TZ = DATA.tz || { offset: 0, label: 'UTC' };
 const LOGIN = (DATA.user && DATA.user.login) || 'you';
 const PERSONAL = !DATA.kind || DATA.kind === 'user';     // orgs and repos show everyone's commits
 const YOUR = PERSONAL ? 'your ' : '';
+// who wrote each commit (the agent lens): payload.who names the actors and each commit row carries an index into it
+// (0, or absent, = a person). Older payloads have no who at all, which reads as every commit human.
+const WHO = Array.isArray(DATA.who) && DATA.who.length ? DATA.who : ['human'];
+const AGENT = Object.fromEntries(AGENT_RULES.map(a => [a.id, a]));
+const whoHex = id => (!id || id === 'human' ? '#5fd3f3' : id === 'bot' ? '#ffb454' : AGENT[id]?.color || '#c58bff');
+const whoLabel = id => (!id || id === 'human' ? (PERSONAL ? LOGIN : 'people') : id === 'bot' ? 'bots' : AGENT[id]?.label || id);
+const WHO_HEX = WHO.map(whoHex), WHO_LABEL = WHO.map(whoLabel);
+const WHO_RGB = WHO_HEX.map(h => new THREE.Color(h));
 const T_END = DATA.t_end;
 const TAU = 10 * 1440;                    // activity decay constant (minutes)
 const AY = 15;                            // avatar altitude
@@ -81,11 +90,16 @@ const eT = new Float64Array(NE), eF = new Int32Array(NE), eS = new Float32Array(
 }
 // your commits (author time), globally time-sorted
 const C = [];
-for (const r of R) for (const m of r.mine) C.push({ t: m[0], r: r.ri, n: m[1], files: Int32Array.from(m[2], x => x + r.f0) });
+for (const r of R) for (const m of r.mine) C.push({ t: m[0], r: r.ri, n: m[1], files: Int32Array.from(m[2], x => x + r.f0), w: m[3] || 0 });
 C.sort((a, b) => a.t - b.t);
 const cT = Float64Array.from(C, c => c.t);
 const NC = C.length;
-for (const r of R) r.cT = Float64Array.from(r.mine.map(m => m[0]).sort((a, b) => a - b));
+for (const r of R) {
+  const ms = r.mine.slice().sort((a, b) => a[0] - b[0]);
+  r.cT = Float64Array.from(ms, m => m[0]);
+  r.cW = Uint8Array.from(ms, m => m[3] || 0);
+}
+const HAS_WHO = C.some(c => c.w);
 const maxCum = Math.max(...R.map(r => r.mine.length));
 for (const r of R) {
   const ts = new Set();
@@ -94,7 +108,12 @@ for (const r of R) {
 }
 const N_DAYS = Math.ceil(T_END / 1440) + 1;
 const dayCounts = new Uint16Array(N_DAYS);
-for (const c of C) if (c.t >= 0) dayCounts[Math.floor(c.t / 1440)]++;
+const dayWho = new Uint16Array(N_DAYS * WHO.length);       // per day, per actor: the timeline's stacks under the lens
+for (const c of C) if (c.t >= 0) {
+  const d = Math.floor(c.t / 1440);
+  dayCounts[d]++;
+  dayWho[d * WHO.length + c.w]++;
+}
 
 // ───────────────────────────────────────────────────────────── islands
 const { pos, sectors } = placeIslands(R.map(r => ({ key: r.ri, org: r.owner, R: r.lay.L * 0.7071 + 0.8, weight: r.mine.length })));
@@ -433,7 +452,7 @@ for (const r of R) {
   r.label.position.set(r.x, r.portY + 1.4, r.z);
   scene.add(r.label);
   // live state
-  Object.assign(r, { cum: 0, heat: 0, act: 0, last: -Infinity, alive: 0, lines: 0, baseV: 0, baseFrom: 0, baseTo: 0, baseT0: 0,
+  Object.assign(r, { whoCum: new Uint32Array(WHO.length), cum: 0, heat: 0, act: 0, last: -Infinity, alive: 0, lines: 0, baseV: 0, baseFrom: 0, baseTo: 0, baseT0: 0,
     flash: 0, beamGrow: 0, beamBorn: false, dirty: false, platDirty: false, glowDirty: false, platGlowDirty: false });
 }
 // org sector labels
@@ -532,6 +551,7 @@ function glowDir(d) {
 let T = 0;
 let ePtr = 0, cPtr = 0;
 let totalAlive = 0, totalLines = 0;
+const whoSoFar = new Uint32Array(WHO.length);
 let playing = true, scrubbing = false;
 let speedIdx = 3, curSpeed = SPEEDS[3].v;
 let heatT = 0;
@@ -560,13 +580,14 @@ function applyEvent(k, live) {
 function fireCommit(k, live) {
   const c = C[k], r = R[c.r];
   r.cum++;
+  r.whoCum[c.w]++; whoSoFar[c.w]++;
   r.heat += Math.exp(-(T - c.t) / TAU);
   r.last = c.t;
   if (!r.beamBorn) {
     r.beamBorn = true;
     if (live) { r.beamGrow = 0; toast(`connected → ${r.name}`, 'new'); } else r.beamGrow = 1;
   }
-  if (live) spawnPulse(r, c.files, 1);
+  if (live) spawnPulse(r, c.files, 1, WHO_RGB[c.w], c.w === 0);
 }
 function advance(nt) {
   nt = clamp(nt, 0, T_END);
@@ -599,9 +620,13 @@ function seek(nt, dur = 0.35) {
   }
   for (let d = 0; d < ND; d++) setDirVis(d, dAlive[d] > 0 ? 1 : 0, dur);
   cPtr = upper(cT, nt);
+  whoSoFar.fill(0);
+  for (let k = 0; k < cPtr; k++) whoSoFar[C[k].w]++;
   for (const r of R) {
     const n = upper(r.cT, nt);
     r.cum = n; r.heat = 0;
+    r.whoCum.fill(0);
+    for (let k = 0; k < n; k++) r.whoCum[r.cW[k]]++;
     for (let k = 0; k < n; k++) r.heat += Math.exp(-(nt - r.cT[k]) / TAU);
     r.last = n ? r.cT[n - 1] : -Infinity;
     r.beamBorn = n > 0; r.beamGrow = n > 0 ? 1 : 0;
@@ -623,6 +648,7 @@ function checkQuietRepos(prevT, nt) {
 }
 
 // ───────────────────────────────────────────────────────────── pulses + shockwaves
+let lens = false;                          // the agent lens: colour by who sent each commit
 const MAXP = 320, TRAIL = 9;
 const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(MAXP * TRAIL * 3), pSize = new Float32Array(MAXP * TRAIL), pAlpha = new Float32Array(MAXP * TRAIL), pCol = new Float32Array(MAXP * TRAIL * 3);
@@ -637,14 +663,15 @@ const pulsePts = new THREE.Points(pGeo, new THREE.ShaderMaterial({
 pulsePts.frustumCulled = false;
 scene.add(pulsePts);
 const pulses = [];
-function spawnPulse(r, files, n) {
+// col: the sender's colour (shown under the agent lens, and always for live events); human: dimmed under the lens
+function spawnPulse(r, files, n, col = WHO_RGB[0], human = true, live = false) {
   for (let k = pulses.length - 1; k >= Math.max(0, pulses.length - 12); k--) {
     const p = pulses[k];
-    if (p.r === r && NOW - p.t0 < 0.08) { p.files.push(files); p.n += n; return; }
+    if (p.r === r && p.col === col && NOW - p.t0 < 0.08) { p.files.push(files); p.n += n; return; }
   }
-  if (pulses.length >= MAXP) { arrive({ r, files: [files], n }); return; }
-  const dur = clamp(1.25 - Math.log10(curSpeed / 60) * 0.32, 0.55, 1.2);
-  pulses.push({ r, files: [files], n, t0: NOW, dur });
+  if (pulses.length >= MAXP) { arrive({ r, files: [files], n, col, human, live }); return; }
+  const dur = live ? 1.5 : clamp(1.25 - Math.log10(curSpeed / 60) * 0.32, 0.55, 1.2);
+  pulses.push({ r, files: [files], n, t0: NOW, dur, col, human, live });
   avatarKick = 1;
 }
 const tmpV = new THREE.Vector3();
@@ -668,7 +695,8 @@ function updatePulses() {
   pAlpha.fill(0);
   for (let k = 0; k < pulses.length; k++) {
     const p = pulses[k], u = easeIO(clamp((NOW - p.t0) / p.dur, 0, 1));
-    const big = Math.min(1.8, 1 + Math.log2(p.n) * 0.25);
+    const big = Math.min(1.8, 1 + Math.log2(p.n) * 0.25) * (p.live ? 1.5 : 1);
+    const lit = lens || p.live ? p.col : null, dim = lens && p.human && !p.live ? 0.5 : 1;
     for (let j = 0; j < TRAIL; j++) {
       const uj = u - j * 0.016;
       const o = k * TRAIL + j;
@@ -677,8 +705,11 @@ function updatePulses() {
       pPos[o * 3] = tmpV.x; pPos[o * 3 + 1] = tmpV.y; pPos[o * 3 + 2] = tmpV.z;
       const fall = 1 - j / TRAIL;
       pSize[o] = (j === 0 ? 1.15 : 0.75 * fall) * big;
-      pAlpha[o] = (j === 0 ? 1 : 0.55 * fall * fall);
-      pCol[o * 3] = 1.4 + 1.2 * (j === 0); pCol[o * 3 + 1] = 2.2 + 0.8 * (j === 0); pCol[o * 3 + 2] = 2.8;
+      pAlpha[o] = (j === 0 ? 1 : 0.55 * fall * fall) * dim;
+      if (lit) {
+        const b = j === 0 ? 3.4 : 2.6, w = j === 0 ? 0.5 : 0;
+        pCol[o * 3] = lit.r * b + w; pCol[o * 3 + 1] = lit.g * b + w; pCol[o * 3 + 2] = lit.b * b + w;
+      } else { pCol[o * 3] = 1.4 + 1.2 * (j === 0); pCol[o * 3 + 1] = 2.2 + 0.8 * (j === 0); pCol[o * 3 + 2] = 2.8; }
     }
   }
   for (const n of ['position', 'aSize', 'aAlpha', 'aColor']) pGeo.attributes[n].needsUpdate = true;
@@ -693,6 +724,7 @@ for (let k = 0; k < 40; k++) {
   waves.push({ m, t0: -1e9, r: null });
 }
 let waveIdx = 0;
+const WAVE_COL = new THREE.Color(0.5, 1.4, 2.0);
 function arrive(p) {
   const r = p.r;
   for (const files of p.files) for (let q = 0; q < files.length; q++) {
@@ -702,6 +734,7 @@ function arrive(p) {
   r.flash = Math.min(1.6, r.flash + 0.6 + 0.1 * p.n);
   const w = waves[waveIdx++ % waves.length];
   w.t0 = NOW; w.r = r; w.m.visible = true;
+  if ((lens || p.live) && p.col) w.m.material.color.copy(p.col).multiplyScalar(2.2); else w.m.material.color.copy(WAVE_COL);
   w.m.position.set(r.x, 0.06, r.z);
   r.labelEl.classList.remove('bump'); void r.labelEl.offsetWidth; r.labelEl.classList.add('bump');
 }
@@ -766,6 +799,22 @@ function statusOf(r) {
   for (const s of STATUS) if (days <= s.max) return { ...s, days };
   return { ...STATUS[STATUS.length - 1], days };
 }
+// a repo's colour under the lens: its people's colour, pulled toward its bots' and agents' by the square root of
+// their share (so a repo with a tenth of its commits from an agent visibly takes on that agent's colour)
+const mixC = new THREE.Color(), otherC = new THREE.Color();
+function whoMix(r, out) {
+  out.copy(WHO_RGB[0]);
+  if (!r.cum) return out;
+  let n = 0;
+  otherC.setRGB(0, 0, 0);
+  for (let w = 1; w < WHO.length; w++) {
+    const c = r.whoCum[w];
+    if (c) { n += c; otherC.r += WHO_RGB[w].r * c; otherC.g += WHO_RGB[w].g * c; otherC.b += WHO_RGB[w].b * c; }
+  }
+  if (n) out.lerp(otherC.multiplyScalar(1 / n), Math.sqrt(n / r.cum));
+  return out;
+}
+const BEAM_COL = new THREE.Color(0.3, 0.92, 1.45);
 function updateRepoVisuals(dt) {
   for (const r of R) {
     const a = 1 - Math.exp(-r.heat / 1.4);
@@ -792,7 +841,11 @@ function updateRepoVisuals(dt) {
       r.beamMat.uniforms.uPx.value = (0.9 + 3.4 * act * (0.4 + 0.6 * bond) + r.flash * 1.5) * (iso < 1 ? 0.7 : 1);
       r.port.visible = r.beamGrow >= 1;
       r.port.scale.setScalar(0.55 + 0.6 * act + r.flash * 0.5);
-      r.port.material.color.setRGB(0.25 + 0.5 * act, 0.5 + 1.3 * act, 0.7 + 1.7 * act);
+      if (lens) {
+        whoMix(r, mixC);
+        r.beamMat.uniforms.uColor.value.copy(mixC).multiplyScalar(1.7);
+        r.port.material.color.copy(mixC).multiplyScalar(0.7 + 1.6 * act);
+      } else r.port.material.color.setRGB(0.25 + 0.5 * act, 0.5 + 1.3 * act, 0.7 + 1.7 * act);
       r.tether.visible = true;
       r.tether.material.opacity = (0.05 + 0.4 * act) * iso;
     } else {
@@ -945,11 +998,73 @@ function updateBoard() {
     row.b.style.order = k;
     row.n.textContent = fmtInt(r.cum);
     row.fill.style.width = (100 * r.cum / top).toFixed(1) + '%';
+    row.fill.style.background = lens ? splitGradient(r.whoCum, r.cum) : '';
     const st = statusOf(r);
     row.dot.dataset.status = st.key;
     row.b.classList.toggle('sel', r.ri === focusRi);
     row.b.title = `${r.name}: ${st.label}${isFinite(st.days) ? ` (${Math.floor(st.days)} days since the last commit)` : ''}`;
   });
+}
+function splitGradient(counts, total) {
+  if (!total) return '';
+  const stops = [];
+  let at = 0;
+  for (let w = 0; w < WHO.length; w++) {
+    if (!counts[w]) continue;
+    const to = at + (100 * counts[w]) / total;
+    stops.push(`${WHO_HEX[w]} ${at.toFixed(1)}% ${to.toFixed(1)}%`);
+    at = to;
+  }
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+}
+// the split bar and its legend: counts per actor, people first, then by size
+function whoRows(counts) {
+  const tot = counts.reduce((a, b) => a + b, 0);
+  const rows = [];
+  for (let w = 0; w < WHO.length; w++) if (counts[w] || w === 0) rows.push({ w, n: counts[w], p: tot ? counts[w] / tot : 0 });
+  rows.sort((a, b) => (a.w === 0 ? -1 : b.w === 0 ? 1 : b.n - a.n));
+  return { tot, rows };
+}
+function fillSplit(node, rows) {
+  const want = rows.filter(x => x.n);
+  if (node.children.length !== want.length) node.replaceChildren(...want.map(() => document.createElement('span')));
+  want.forEach((x, k) => { const sp = node.children[k]; sp.style.flexGrow = x.n; sp.style.background = WHO_HEX[x.w]; sp.title = `${WHO_LABEL[x.w]}: ${(100 * x.p).toFixed(1)}%`; });
+}
+const pctTxt = p => (p > 0 && p < 0.01 ? '<1%' : `${Math.round(p * 100)}%`);
+function updateWho() {
+  if (!lens) return;
+  const { tot, rows } = whoRows(whoSoFar);
+  fillSplit($('who-split'), rows);
+  const other = tot ? 1 - whoSoFar[0] / tot : 0;
+  setText($('who-pct'), tot ? `${pctTxt(other)} not ${PERSONAL ? 'you' : 'people'}` : '');
+  const shown = rows.slice(0, 6), list = $('who-list');
+  if (list.children.length !== shown.length) list.replaceChildren(...shown.map(() => {
+    const li = document.createElement('li');
+    li.append(document.createElement('i'), Object.assign(document.createElement('span'), { className: 'nm' }),
+      Object.assign(document.createElement('span'), { className: 'n' }), Object.assign(document.createElement('span'), { className: 'p' }));
+    return li;
+  }));
+  shown.forEach((x, k) => {
+    const [dot, nm, n, p] = list.children[k].children;
+    dot.style.background = WHO_HEX[x.w];
+    setText(nm, WHO_LABEL[x.w]); setText(n, fmtInt(x.n)); setText(p, pctTxt(x.p));
+  });
+}
+function setLens(on, quiet) {
+  lens = on;
+  document.body.classList.toggle('lens', on);
+  $('btn-lens').classList.toggle('on', on);
+  $('whobox').hidden = !on;
+  tlBg = null;
+  if (!on) for (const r of R) r.beamMat.uniforms.uColor.value.copy(BEAM_COL);
+  updateWho(); updateBoard();
+  if (on && !quiet) {
+    const all = new Uint32Array(WHO.length);
+    for (const c of C) all[c.w]++;
+    const bot = WHO.indexOf('bot'), agent = all.reduce((a, n, w) => a + (w && w !== bot ? n : 0), 0);
+    toast(HAS_WHO ? `agent lens: ${pctTxt(bot > 0 ? all[bot] / NC : 0)} bots · ${pctTxt(agent / NC)} AI agents over the whole window`
+      : 'agent lens: no bot or agent signatures here, every commit reads as human', 'lens');
+  }
 }
 function langMix(r) {
   const n = new Float64Array(9);
@@ -1016,6 +1131,19 @@ function updateFocus() {
   F.lines.textContent = fmtK(r.lines);
   F.fp.textContent = fmtInt(upper(r.evTimes, T));
   F.last.textContent = r.cum ? `${DTF_DAY.format(tDate(r.last))} · ${st.days < 1 ? 'today' : Math.floor(st.days) + ' d ago'}` : (PERSONAL ? 'no commits from you yet' : 'no commits yet');
+  $('f-whobox').hidden = !HAS_WHO || !r.cum;
+  if (HAS_WHO && r.cum) {
+    const { rows } = whoRows(r.whoCum);
+    fillSplit($('f-who'), rows);
+    setText($('f-who-n'), `${fmtInt(r.cum)} commits`);
+    const top = rows.filter(x => x.n).slice(0, 4);
+    const key = top.map(x => `${x.w}:${pctTxt(x.p)}`).join(',');
+    const lg = $('f-who-l');
+    if (lg.dataset.k !== key) {
+      lg.dataset.k = key;
+      lg.replaceChildren(...top.map(x => { const s = document.createElement('span'), i = document.createElement('i'); i.style.background = WHO_HEX[x.w]; s.append(i, `${WHO_LABEL[x.w]} ${pctTxt(x.p)}`); return s; }));
+    }
+  }
   const mix = langMix(r), tot = mix.reduce((a, b) => a + b, 0) || 1;
   F.mix.replaceChildren(...[...mix].map((v, k) => {
     const s = document.createElement('span');
@@ -1064,10 +1192,10 @@ function updateHUD() {
   }
 }
 function setText(node, v) { const s = String(v); if (node.textContent !== s) node.textContent = s; }
-function toast(msg, kind) {
+function toast(msg, kind, whenText) {
   const t = document.createElement('div');
   t.className = 'toast ' + (kind || '');
-  const when = document.createElement('small'); when.textContent = DTF_DAY.format(tDate(T));
+  const when = document.createElement('small'); when.textContent = whenText || DTF_DAY.format(tDate(T));
   t.append(when, document.createTextNode(msg));
   el.toasts.prepend(t);
   while (el.toasts.children.length > 4) el.toasts.lastChild.remove();
@@ -1122,9 +1250,19 @@ function drawTimelineBg() {
   for (let d = 0; d < N_DAYS; d++) {
     const v = dayCounts[d];
     if (!v) continue;
-    const x = TL_PAD + (d * 1440 / T_END) * w, bh = Math.max(1.5, (base - 4) * Math.sqrt(v / mx));
+    const x = TL_PAD + (d * 1440 / T_END) * w, bh = Math.max(1.5, (base - 4) * Math.sqrt(v / mx)), bw = Math.max(1, w / N_DAYS - 0.4);
     g.fillStyle = 'rgba(120,170,230,0.55)';
-    g.fillRect(x, base - bh, Math.max(1, w / N_DAYS - 0.4), bh);
+    g.fillRect(x, base - bh, bw, bh);
+    if (lens && dayWho[d * WHO.length] < v) {           // people at the bottom, everyone else stacked on top
+      let y = base - bh;
+      for (let k = 1; k < WHO.length; k++) {
+        const n = dayWho[d * WHO.length + k];
+        if (!n) continue;
+        const h = bh * n / v;
+        g.fillStyle = WHO_HEX[k]; g.fillRect(x, y, bw, h);
+        y += h;
+      }
+    }
   }
   g.font = '10px system-ui, sans-serif'; g.textBaseline = 'top';
   const start = tDate(0);
@@ -1296,9 +1434,14 @@ $('btn-home').addEventListener('click', () => focusRepo(-1));
 $('btn-hud').addEventListener('click', () => document.body.classList.toggle('bare'));
 $('f-close').addEventListener('click', () => focusRepo(-1));
 $('btn-quality').addEventListener('click', () => setQuality(quality === 'high' ? 'low' : 'high'));
+$('btn-lens').addEventListener('click', () => setLens(!lens));
+$('btn-rec').addEventListener('click', () => toggleRecPanel());
+$('rec-stop').addEventListener('click', () => stopRecord());
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input, textarea')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;              // leave browser shortcuts (cmd+R, ctrl+A) alone
   const k = e.key;
+  if (rec) { if (k === 'Escape') stopRecord(); return; }
   if (k === ' ') { e.preventDefault(); setPlaying(!playing); }
   else if (k === 'ArrowRight') { e.preventDefault(); const step = e.shiftKey ? 60 : 1440; const was = playing; playing = false; advance(Math.min(T_END, T + step)); playing = was; }
   else if (k === 'ArrowLeft') { e.preventDefault(); seek(T - (e.shiftKey ? 60 : 1440), 0.3); }
@@ -1312,6 +1455,8 @@ window.addEventListener('keydown', e => {
   else if (k === 'l' || k === 'L') { labelsOn = !labelsOn; el.labels.classList.toggle('on', labelsOn); }
   else if (k === 'h' || k === 'H') document.body.classList.toggle('bare');
   else if ((k === 'f' || k === 'F') && hoverRi >= 0) focusRepo(hoverRi);
+  else if (k === 'a' || k === 'A') setLens(!lens);
+  else if (k === 'r' || k === 'R') toggleRecPanel();
 });
 function setQuality(q) {
   quality = q;
@@ -1335,6 +1480,216 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 
+
+// ───────────────────────────────────────────────────────────── record a clip
+// The stage becomes a viewfinder in the clip's shape, the year replays in a fixed number of seconds, and each frame is
+// copied with its labels and a title overlay onto a 2D canvas that MediaRecorder encodes. Nothing leaves the browser.
+const REC_FMT = { '16:9': [1280, 720], '9:16': [720, 1280], '1:1': [1080, 1080] };
+let rec = null, recSpeed = null;
+const recOpts = { fmt: '16:9', secs: 20 };
+const SLUG = String((window.CC && window.CC.target) || LOGIN).replace(/[^\w.-]+/g, '-');
+const TARGET = (window.CC && window.CC.target) || LOGIN;
+function recMime() {
+  if (typeof MediaRecorder === 'undefined' || !HTMLCanvasElement.prototype.captureStream) return null;
+  for (const m of ['video/mp4;codecs=avc1.42E01F', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']) {
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch { /* some browsers throw on unknown types */ }
+  }
+  return null;
+}
+function segs(name, opts, val) {
+  return `<div class="segs" data-k="${name}">${opts.map(([v, t]) => `<button class="seg${String(v) === String(val) ? ' on' : ''}" data-v="${v}">${t}</button>`).join('')}</div>`;
+}
+function toggleRecPanel(force) {
+  const pn = $('recpanel');
+  const show = force ?? pn.hidden;
+  if (!show) { pn.hidden = true; return; }
+  const mime = recMime();
+  pn.innerHTML = `<h3>Record a clip<button id="rec-x" aria-label="Close">×</button></h3>
+    <p>The whole window replays from the first day to the last while the camera orbits. It renders in your browser; nothing is uploaded.</p>
+    ${mime ? `<div class="lbl">Shape</div>${segs('fmt', [['16:9', '16:9 wide'], ['9:16', '9:16 tall'], ['1:1', '1:1 square']], recOpts.fmt)}
+    <div class="lbl">Length</div>${segs('secs', [[10, '10 s'], [20, '20 s'], [30, '30 s']], recOpts.secs)}
+    <button class="go" id="rec-go">● Start recording</button>
+    <p style="margin:10px 0 0">${/mp4/.test(mime) ? 'Saves as MP4' : 'Saves as WebM'}${lens ? ', with the agent lens on' : ''}. Esc stops early and keeps what was recorded.</p>`
+    : '<p>This browser cannot record video from a page. A current Chrome, Edge, Firefox or Safari can.</p>'}`;
+  pn.hidden = false;
+  pn.querySelectorAll('.segs').forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    recOpts[g.dataset.k] = g.dataset.k === 'secs' ? +b.dataset.v : b.dataset.v;
+    g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  }));
+  $('rec-x').onclick = () => (pn.hidden = true);
+  const go = $('rec-go');
+  if (go) go.onclick = () => record(recOpts).then(showClip, err => { finishRecord(); toast(`recording failed: ${err.message || err}`, 'quiet'); });
+}
+function record({ fmt = '16:9', secs = 20 } = {}) {
+  const mime = recMime();
+  if (!mime) return Promise.reject(new Error('this browser cannot record video'));
+  if (rec) return Promise.reject(new Error('already recording'));
+  const [W, H] = REC_FMT[fmt] || REC_FMT['16:9'];
+  const fit = Math.min((window.innerWidth - 32) / W, (window.innerHeight - 84) / H);
+  const cw = Math.max(120, Math.floor(W * fit)), ch = Math.max(120, Math.floor(H * fit));
+  document.body.style.setProperty('--rec-w', `${cw}px`);
+  document.body.style.setProperty('--rec-h', `${ch}px`);
+  document.body.classList.add('rec');
+  $('recpanel').hidden = true;
+  hideTip(); hoverBox.visible = false;
+  renderer.setPixelRatio(Math.min(3, W / cw));
+  onResize();
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const stream = cv.captureStream(30);
+  const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: Math.round(W * H * 30 * 0.24) });
+  const chunks = [];
+  // from the top: overview camera, orbiting, the whole window in `secs` seconds
+  focusRepo(-1); fly = null;
+  camera.position.copy(HOME.pos); controls.target.copy(HOME.target);
+  controls.autoRotate = true; controls.autoRotateSpeed = 1.1; syncOrbitBtn();
+  seek(0, 0);
+  recSpeed = curSpeed = T_END / secs;
+  setPlaying(true);
+  return new Promise((resolve, reject) => {
+    rec = { W, H, cw, ch, g, mr, t0: NOW, end: 0, mime, fmt };
+    mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onerror = e => reject(e.error || new Error('the recorder stopped'));
+    mr.onstop = () => {
+      const blob = new Blob(chunks, { type: mime.split(';')[0] });
+      const info = { blob, mime, fmt, W, H };
+      finishRecord();
+      if (!blob.size) reject(new Error('the clip came out empty')); else resolve(info);
+    };
+    mr.start(500);
+    drawRecFrame();
+  });
+}
+function stopRecord() { if (rec && rec.mr.state !== 'inactive') rec.mr.stop(); }
+function finishRecord() {
+  if (!rec && !document.body.classList.contains('rec')) return;
+  rec = null; recSpeed = null;
+  document.body.classList.remove('rec');
+  controls.autoRotateSpeed = 0.55;
+  setQuality(quality);
+}
+function showClip({ blob, mime, fmt, W, H }) {
+  const url = URL.createObjectURL(blob), ext = /mp4/.test(mime) ? 'mp4' : 'webm';
+  const name = `commit-city-${SLUG}-${fmt.replace(':', 'x')}.${ext}`;
+  const file = typeof File !== 'undefined' ? new File([blob], name, { type: blob.type }) : null;
+  const canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+  const pn = $('recpanel');
+  pn.innerHTML = `<h3>Your clip<button id="rec-x" aria-label="Close">×</button></h3>
+    <video src="${url}" autoplay muted loop playsinline controls></video>
+    <div class="rec-actions"><a class="pri" href="${url}" download="${name}">Download .${ext}</a>${canShare ? '<button id="rec-share">Share…</button>' : ''}<button id="rec-again">Record again</button></div>
+    <p>${(blob.size / 1e6).toFixed(1)} MB · ${W}×${H}${ext === 'webm' ? ' · WebM. Some sites only take MP4; Safari and recent Chrome record MP4 directly.' : ''}</p>`;
+  pn.hidden = false;
+  $('rec-x').onclick = () => { pn.hidden = true; URL.revokeObjectURL(url); };
+  $('rec-again').onclick = () => { URL.revokeObjectURL(url); toggleRecPanel(true); };
+  const sh = $('rec-share');
+  if (sh) sh.onclick = () => navigator.share({ files: [file], title: `${TARGET} on commit.city`, text: `${TARGET} on GitHub, as a city` }).catch(() => {});
+}
+function rrect(g, x, y, w, h, r) { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); }
+function drawRecFrame() {
+  const { g, W, H, cw } = rec, k = W / cw, u = Math.min(W, H) / 720;
+  g.drawImage(renderer.domElement, 0, 0, W, H);
+  // the page draws labels as HTML; the clip draws them by hand where the page shows them
+  g.textBaseline = 'middle';
+  for (const r of R) {
+    if (!r.label.visible) continue;
+    projV.copy(r.label.position).project(camera);
+    if (projV.z > 1) continue;
+    const x = (projV.x * 0.5 + 0.5) * W, y = (-projV.y * 0.5 + 0.5) * H;
+    g.globalAlpha = +(r.labelEl.style.opacity || 1);
+    const f1 = `600 ${11.5 * k}px system-ui, sans-serif`, f2 = `${10 * k}px system-ui, sans-serif`;
+    g.font = f2; const wo = g.measureText(r.owner).width;
+    g.font = f1; const wn = g.measureText(r.short).width, wc = g.measureText(String(r.cum)).width;
+    const gap = 5 * k, w = wo + wn + wc + gap * 2 + 15 * k, h = 20 * k;
+    rrect(g, x - w / 2, y - h / 2, w, h, h / 2);
+    g.fillStyle = 'rgba(6,10,18,0.7)'; g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = k; g.stroke();
+    let tx = x - w / 2 + 7 * k;
+    g.font = f2; g.fillStyle = '#7f8ca2'; g.fillText(r.owner, tx, y); tx += wo + gap;
+    g.font = f1; g.fillStyle = '#e8eef7'; g.fillText(r.short, tx, y); tx += wn + gap;
+    g.fillStyle = lens ? (r.whoCum[0] === r.cum ? '#5fd3f3' : '#c58bff') : '#5fd3f3'; g.fillText(String(r.cum), tx, y);
+  }
+  g.globalAlpha = 1;
+  // title, date and counter over a soft vignette
+  let gr = g.createLinearGradient(0, 0, 0, 190 * u);
+  gr.addColorStop(0, 'rgba(4,6,12,0.82)'); gr.addColorStop(1, 'rgba(4,6,12,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, 190 * u);
+  gr = g.createLinearGradient(0, H - 110 * u, 0, H);
+  gr.addColorStop(0, 'rgba(4,6,12,0)'); gr.addColorStop(1, 'rgba(4,6,12,0.85)');
+  g.fillStyle = gr; g.fillRect(0, H - 110 * u, W, 110 * u);
+  const P = 32 * u;
+  g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  g.font = `600 ${15 * u}px system-ui, sans-serif`; g.fillStyle = '#5fd3f3'; g.fillText('commit.city', P, P + 12 * u);
+  g.font = `700 ${34 * u}px system-ui, sans-serif`; g.fillStyle = '#f2f6fb'; g.fillText(TARGET, P, P + 52 * u, W * 0.6);
+  g.font = `500 ${17 * u}px system-ui, sans-serif`; g.fillStyle = '#b4c0d3'; g.fillText(DTF_DATE.format(tDate(T)), P, P + 80 * u);
+  g.textAlign = 'right';
+  g.font = `750 ${44 * u}px system-ui, sans-serif`; g.fillStyle = '#f2f6fb'; g.fillText(fmtInt(cPtr), W - P, P + 40 * u);
+  g.font = `500 ${14 * u}px system-ui, sans-serif`; g.fillStyle = '#7f8ca2'; g.fillText(PERSONAL ? 'commits' : 'commits landed', W - P, P + 62 * u);
+  if (lens && cPtr) {                                  // who wrote it, as a bar under the counter
+    const bw = 200 * u, bx = W - P - bw, by = P + 76 * u;
+    let x = bx;
+    for (const row of whoRows(whoSoFar).rows) { if (!row.n) continue; const ww = bw * row.p; g.fillStyle = WHO_HEX[row.w]; g.fillRect(x, by, Math.max(1, ww - 1), 6 * u); x += ww; }
+  }
+  g.textAlign = 'left';
+  // the year as a progress bar, and where to find it
+  const bx = P, bw = W - P * 2, by = H - 26 * u;
+  g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(bx, by, bw, 4 * u);
+  g.fillStyle = '#5fd3f3'; g.shadowColor = '#5fd3f3'; g.shadowBlur = 10 * u;
+  g.fillRect(bx, by, bw * clamp(T / T_END, 0, 1), 4 * u); g.shadowBlur = 0;
+  g.font = `500 ${14 * u}px ui-monospace, SFMono-Regular, Menlo, monospace`; g.fillStyle = '#b4c0d3';
+  g.fillText(`commit.city/${TARGET}`, bx, by - 12 * u);
+  // timing: hold a beat on the finished city, then stop
+  if (T >= T_END - 1e-6 && !rec.end) rec.end = NOW;
+  if (rec.end && NOW - rec.end > 1.6) stopRecord();
+  const s = Math.floor(NOW - rec.t0);
+  setText($('rec-time'), `REC ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+}
+
+// ───────────────────────────────────────────────────────────── live: what happened since the city was built
+// On commit.city, once the replay reaches the end, the city keeps listening: the owner's (or org's, or repo's) newest
+// public events fly in as beams in their sender's colour. GitHub publishes events about five minutes late.
+const LIVE = { on: false, seen: new Set(), since: Date.parse(DATA.generated || '') / 1000 || Date.now() / 1000, n: 0, timer: 0, queue: [] };
+const LIVE_RGB = new Map();
+const liveColor = who => { let c = LIVE_RGB.get(who); if (!c) LIVE_RGB.set(who, (c = new THREE.Color(whoHex(who)))); return c; };
+const repoByName = new Map(R.map(r => [r.name.toLowerCase(), r]));
+const LIVE_VERB = { push: 'pushed to', pr: 'opened a pull request in', merge: 'merged a pull request in', review: 'reviewed in', issue: 'opened an issue in',
+  comment: 'commented in', release: 'released', create: 'created a branch in', delete: 'deleted a branch in', star: 'starred', fork: 'forked' };
+async function pollLive() {
+  if (document.hidden || rec) return;
+  const kind = DATA.kind === 'org' ? '&kind=org' : '';
+  try {
+    const res = await fetch(`/api/pulse?t=${encodeURIComponent(TARGET)}${kind}`);
+    if (!res.ok) return;
+    const { events } = await res.json();
+    for (const e of events || []) {
+      if (LIVE.seen.has(e.id)) continue;
+      LIVE.seen.add(e.id);
+      if (e.t <= LIVE.since) continue;
+      const r = repoByName.get(String(e.repo).toLowerCase());
+      if (r) LIVE.queue.push({ e, r });
+    }
+  } catch { /* offline, or GitHub is slow: try again next time */ }
+}
+function dripLive() {
+  const it = LIVE.queue.shift();
+  if (!it) return;
+  const { e, r } = it;
+  LIVE.n++;
+  spawnPulse(r, [], 1, liveColor(e.who), !e.who, true);
+  const by = e.who && e.who !== 'bot' ? ` (${whoLabel(e.who)})` : '';
+  toast(`${e.actor}${by} ${LIVE_VERB[e.type] || 'touched'} ${r.name}`, 'live', `${Math.max(1, Math.round((Date.now() / 1000 - e.t) / 60))} min ago`);
+  setText($('live-n'), `${LIVE.n} since built`);
+}
+function startLive() {
+  if (LIVE.on || !window.CC || !/^https?:/.test(location.protocol)) return;
+  LIVE.on = true;
+  $('livebadge').hidden = false;
+  pollLive();
+  LIVE.timer = setInterval(pollLive, 60_000);
+  setInterval(dripLive, 1400);
+}
+
 // ───────────────────────────────────────────────────────────── URL state (deep links / screenshots)
 function parseHash() {
   const q = new URLSearchParams(location.hash.slice(1));
@@ -1350,6 +1705,8 @@ function parseHash() {
   if (q.has('hud')) out.hud = q.get('hud') !== '0';
   if (q.has('orbit')) out.orbit = q.get('orbit') !== '0';
   if (q.has('cam')) { const a = q.get('cam').split(',').map(Number); if (a.length === 6 && a.every(isFinite)) out.cam = a; }
+  if (q.has('lens')) out.lens = !['0', 'off', ''].includes(q.get('lens'));
+  out.embed = q.get('embed') === '1';
   return out;
 }
 
@@ -1361,7 +1718,7 @@ function frame(now, logicOnly = false) {
   lastFrame = now;
   NOW = now / 1000;
   TIME.value = NOW;
-  const target = SPEEDS[speedIdx].v;
+  const target = recSpeed ?? SPEEDS[speedIdx].v;
   curSpeed += (target - curSpeed) * (1 - Math.exp(-dt * 3.5));
   if (scrubTo !== null) { seek(scrubTo, 0.2); scrubTo = null; }
   if (playing && !scrubbing) {
@@ -1393,17 +1750,19 @@ function frame(now, logicOnly = false) {
   try {
     updateHUD();
     if (NOW - lastSlow > 0.12) { lastSlow = NOW; updateLabels(); drawTicker(); }
-    if (NOW - lastBoard > 0.3) { lastBoard = NOW; updateBoard(); updateFocus(); }
+    if (NOW - lastBoard > 0.3) { lastBoard = NOW; updateBoard(); updateFocus(); updateWho(); }
     drawTimeline();
   } catch (err) { if (!frame.warned) { frame.warned = true; console.error(err); } }
   if (logicOnly) return;
   composer.render();
   labelRenderer.render(scene, camera);
+  if (rec) drawRecFrame();
+  if (!LIVE.on && T >= T_END - 1e-6) startLive();
   // adaptive quality: drop bloom / pixel ratio if the machine can't keep up
   fpsAcc += dt; fpsN++;
   if (fpsAcc > 2) {
     const fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0;
-    if (quality === 'high' && fps < 28) { lowFpsFor++; if (lowFpsFor >= 2) setQuality('low'); } else lowFpsFor = 0;
+    if (quality === 'high' && fps < 28 && !rec) { lowFpsFor++; if (lowFpsFor >= 2) setQuality('low'); } else lowFpsFor = 0;
   }
 }
 
@@ -1419,13 +1778,23 @@ syncOrbitBtn();
 el.labels.classList.toggle('on', labelsOn);
 if (init.cam) { camera.position.set(init.cam[0], init.cam[1], init.cam[2]); controls.target.set(init.cam[3], init.cam[4], init.cam[5]); }
 if (init.focus >= 0) { focusRepo(init.focus); if (fly) fly.dur = 0.001; }
+if (init.lens) setLens(true, true);
+if (init.embed) {
+  // inside someone else's page the wheel scrolls that page until the city is clicked
+  controls.enableZoom = false;
+  renderer.domElement.addEventListener('pointerdown', () => { controls.enableZoom = true; }, { once: true });
+  const a = $('embed-link');
+  if (a) { a.href = `${location.origin}${location.pathname}${location.search}`; a.textContent = `commit.city/${TARGET} ↗`; }
+}
 setPlaying(init.play ?? true);
 el.loading.classList.add('done');
 setTimeout(() => el.loading.remove(), 900);
 requestAnimationFrame(loop);
-function step(seconds) {                      // deterministic frames for the self-test
+function step(seconds, render = false) {      // deterministic frames for the self-test (render: draw them too)
   let t = Math.max(performance.now(), lastFrame);
-  for (let k = 0; k < Math.round(seconds * 60); k++) { t += 1000 / 60; frame(t, true); }
+  for (let k = 0; k < Math.max(1, Math.round(seconds * 60)); k++) { t += 1000 / 60; frame(t, !render); }
 }
-window.__lapse = { step, R, seek, advance, get T() { return T; }, get playing() { return playing; }, focusRepo, camera, controls, T_END, EPOCH };
+window.__lapse = { step, R, seek, advance, get T() { return T; }, get playing() { return playing; }, focusRepo, camera, controls, T_END, EPOCH,
+  get lens() { return lens; }, setLens, WHO, whoSoFar, record, stopRecord, recMime, toggleRecPanel, get recording() { return !!rec; }, LIVE,
+  get recInfo() { return rec ? { end: rec.end, state: rec.mr.state, T } : null; }, get recCanvas() { return rec ? rec.g.canvas : null; } };
 if (/(^|&)selftest=1/.test(location.hash.slice(1))) import('./selftest.js').then(m => m.run(window.__lapse));

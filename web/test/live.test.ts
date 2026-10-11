@@ -33,6 +33,7 @@ for (const repo of REPOS) {
     for (const c of record.commits) {
       const m = mine.get(c[0]);
       assert.ok(m, `commit ${c[0]} missing from python`);
+      assert.equal(c[6], m[5], `who wrote ${c[0]}`);
       if (c[4] === 0 && m[2] !== 0) { unknown++; continue; }      // parent beyond the shallow edge
       assert.deepEqual([c[1], c[2], c[4], c[5]], [m[0], m[1], m[2], m[3]], `commit ${c[0]}`);
     }

@@ -67,6 +67,17 @@ export async function run(L) {
     const h0 = L.T; L.step(1); const h1 = L.T;
     check('hidden UI keeps rendering and playing', document.body.classList.contains('bare') && h1 > h0, `${h0.toFixed(0)} → ${h1.toFixed(0)}`);
     key('h'); key(' ');
+    L.seek(L.T_END * 0.8); L.step(0.2);
+    key('a'); L.step(0.4);
+    const actors = document.querySelectorAll('#who-list li').length;
+    check('A turns the agent lens on', L.lens && document.body.classList.contains('lens') && !$('whobox').hidden && actors >= 1, `${actors} actors: ${$('who-list').textContent.slice(0, 80)}`);
+    const counted = [...L.whoSoFar].reduce((x, y) => x + y, 0);
+    check('the who split accounts for every commit so far', String(counted) === $('c-total').textContent.replace(/,/g, ''), `${counted} vs ${$('c-total').textContent}`);
+    L.seek(L.T_END * 0.3); L.step(0.4);
+    const early = [...L.whoSoFar].reduce((x, y) => x + y, 0);
+    check('the who split follows a seek', early <= counted && String(early) === $('c-total').textContent.replace(/,/g, ''), `${early}`);
+    key('a'); L.step(0.2);
+    check('A again turns the lens off', !L.lens && $('whobox').hidden);
     L.seek(L.T_END - 20); key(' '); L.step(1);
     check('lapse stops at the end', !L.playing && L.T >= L.T_END - 1e-6);
     key(' '); L.step(0.2);
@@ -75,6 +86,25 @@ export async function run(L) {
   } catch (e) {
     check('selftest ran to completion', false, e.message + ' ' + (e.stack || '').split('\n')[1]);
   }
+  // a clip runs on the wall clock (MediaRecorder), so it's the one check that waits for real frames
+  if (L.recMime()) {
+    // frames are stepped by hand (headless issues few animation frames on virtual time), and a network round trip
+    // between them pauses virtual time so the encoder gets real time to work
+    let clip = null, err = null;
+    L.setLens(true, true);
+    L.record({ fmt: '9:16', secs: 1 }).then(c => (clip = c), e => (err = e));
+    let snap = null;
+    for (let i = 0; i < 600 && !clip && !err; i++) {
+      if (L.recording) L.step(1 / 30, true);
+      if (i === 24 && L.recCanvas) snap = L.recCanvas.toDataURL('image/jpeg', 0.85);   // a frame of the clip, shown with the results
+      await fetch(`/favicon.svg?settle=${i}`, { cache: 'no-store' }).catch(() => {});
+    }
+    if (!clip && !err) { err = new Error(`no clip ${JSON.stringify(L.recInfo)}`); L.stopRecord(); }
+    check('R records a clip and restores the page', !!clip && clip.blob.size > 2000 && !document.body.classList.contains('rec') && !L.recording,
+      clip ? `${clip.mime} · ${(clip.blob.size / 1e3).toFixed(0)} kB · ${clip.W}x${clip.H}` : String(err && err.message));
+    L.setLens(false, true);
+    if (snap) { const im = new Image(); im.src = snap; im.id = 'selftest-clip'; im.style.cssText = 'position:fixed;right:16px;top:16px;z-index:99;height:calc(100vh - 32px);border-radius:8px;box-shadow:0 0 0 1px #fff3'; document.body.appendChild(im); }
+  } else check('recording skipped: no MediaRecorder in this browser', true);
   check('no uncaught page errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   const pre = document.createElement('pre');
   pre.id = 'selftest';

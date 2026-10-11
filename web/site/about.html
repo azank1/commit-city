@@ -1,0 +1,242 @@
+<!--page {
+  "title": "How commit.city works",
+  "ogTitle": "How commit.city works: git history replayed as a city",
+  "description": "How commit.city turns GitHub history into a 3D city: URLs, reading a city, the agent lens, the live view, sharing, privacy and opt-out, limits, self-hosting for private repos, and the API.",
+  "path": "/about",
+  "ogImage": "/api/og?page=about"
+}-->
+<style>
+.docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; padding: 8px 0 100px; }
+.toc { position: sticky; top: calc(var(--nav-h) + 24px); align-self: start; display: grid; gap: 2px; font-size: 14px; }
+.toc a { color: var(--muted); padding: 5px 10px; border-radius: 8px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); text-decoration: none; background: rgba(255, 255, 255, 0.03); }
+.toc a.on { color: var(--ink); border-left-color: var(--accent); background: rgba(95, 211, 243, 0.06); }
+.prose { max-width: 780px; }
+.prose section { padding-top: 12px; margin-bottom: 56px; }
+.prose h2 { font-size: 28px; letter-spacing: -0.025em; font-weight: 740; margin-bottom: 14px; }
+.prose h3 { font-size: 17px; font-weight: 650; margin: 28px 0 8px; }
+.prose p, .prose li { color: var(--ink-2); font-size: 15.5px; }
+.prose li { margin: 6px 0; }
+.prose b, .prose strong { color: var(--ink); font-weight: 600; }
+.prose code { color: var(--ink); background: rgba(255, 255, 255, 0.06); padding: 1px 6px; border-radius: 6px; font-size: 0.86em; }
+.prose .code { margin: 14px 0; }
+.prose .code pre code { background: none; padding: 0; }
+.prose table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14.5px; }
+.prose th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border-bottom: 1px solid var(--line-2); }
+.prose td { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+.prose td:first-child { color: var(--ink); white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+.callout { border: 1px solid rgba(95, 211, 243, 0.25); background: rgba(95, 211, 243, 0.05); border-radius: 14px; padding: 16px 18px; margin: 18px 0; color: var(--ink-2); font-size: 14.5px; }
+.callout.agent { border-color: rgba(197, 139, 255, 0.3); background: rgba(197, 139, 255, 0.05); }
+.agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 16px 0; }
+.agents-grid div { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-1); }
+.agents-grid b { display: flex; align-items: center; gap: 8px; font-size: 14.5px; color: var(--ink); }
+.agents-grid b i { width: 10px; height: 10px; border-radius: 3px; }
+.agents-grid small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+.flow div { position: relative; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-1); }
+.flow div b { display: block; color: var(--ink); font-size: 14px; margin-bottom: 4px; }
+.flow div small { color: var(--muted); font-size: 12.5px; line-height: 1.45; display: block; }
+.flow div:not(:last-child)::after { content: "→"; position: absolute; right: -10px; top: 50%; transform: translate(50%, -50%); color: var(--accent); z-index: 1; }
+@media (max-width: 960px) { .docs { grid-template-columns: minmax(0, 1fr); } .toc { display: none; } }
+@media (max-width: 640px) { .flow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .flow div::after { display: none; } }
+</style>
+<main>
+<header class="phead">
+  <div class="backdrop"></div>
+  <div class="wrap">
+    <span class="kick">How it works</span>
+    <h1 class="h1">Git history, drawn to scale.</h1>
+    <p class="lede">commit.city replays the real history of public GitHub repos, file by file and commit by commit, and draws it as a city you can scrub, fly through and share.
+      This page covers what the city shows, how it's built, and what it does and doesn't do with your data.</p>
+  </div>
+</header>
+<div class="wrap docs">
+  <nav class="toc" aria-label="On this page">
+    <a href="#urls">URLs</a><a href="#reading">Reading a city</a><a href="#controls">Controls</a><a href="#agents">The agent lens</a><a href="#live">GitHub, live</a>
+    <a href="#sharing">Sharing</a><a href="#privacy">Privacy</a><a href="#opt-out">Hiding your city</a><a href="#limits">Limits</a><a href="#self-host">Private repos</a>
+    <a href="#api">API &amp; embeds</a><a href="#how">How it's built</a><a href="#faq">FAQ</a>
+  </nav>
+  <article class="prose">
+    <section id="urls">
+      <h2>Swap the domain</h2>
+      <p>Take any GitHub URL and change <code>github.com</code> to <code>commit.city</code>. There's no sign-up and nothing to install.</p>
+      <div class="tablewrap"><table>
+        <tr><th>URL</th><th>What you get</th></tr>
+        <tr><td><a href="/torvalds">commit.city/torvalds</a></td><td>A person's year: every public repo they committed to in the last 365 days, wired to their avatar.</td></tr>
+        <tr><td><a href="/vercel">commit.city/vercel</a></td><td>An organisation: its 24 busiest repos, with everyone's commits.</td></tr>
+        <tr><td><a href="/facebook/react">commit.city/facebook/react</a></td><td>One repository and every contributor, over the last year.</td></tr>
+        <tr><td><a href="/denoland/deno?all=1">commit.city/denoland/deno?all=1</a></td><td>A repository's entire history, from its first commit.</td></tr>
+      </table></div>
+      <p>The first visit builds the city while you watch, repo by repo: a few seconds for a small account, a few minutes for a big one. After that it's cached and opens instantly for everyone, and anyone can ask for a fresh build once it's a few hours old.</p>
+    </section>
+
+    <section id="reading">
+      <h2>Reading a city</h2>
+      <ul>
+        <li><b>Islands are repos.</b> Each is a squarified treemap of the repo's file tree. In an org city, repos cluster into sectors.</li>
+        <li><b>Platforms are directories</b>, stacked by depth, so the shape of an island is the shape of its architecture.</li>
+        <li><b>Towers are files.</b> Height is line count; colour is file type. Footprints never move, so you can watch a single file grow, shrink, get renamed or disappear.</li>
+        <li><b>Beams are commits.</b> Each one flies from the author to the island it lands on, and the files it touched flash.</li>
+        <li><b>Repos cool as they go quiet</b>: hot, active, cooling, dormant, abandoned. The beam to an abandoned repo thins to a thread.</li>
+        <li><b>Days and nights</b> follow the timezone the commits were actually made in.</li>
+      </ul>
+      <div class="callout">A city draws commits that <b>landed on the default branch</b> of a <b>public</b> repo. That's why it can show fewer than your contribution graph, which also counts pull requests, issues, reviews and private work. The panel shows both numbers.</div>
+    </section>
+
+    <section id="controls">
+      <h2>Controls</h2>
+      <div class="tablewrap"><table>
+        <tr><th>Input</th><th>Action</th></tr>
+        <tr><td>drag · right-drag · scroll</td><td>orbit · pan · zoom</td></tr>
+        <tr><td>click a repo or a leaderboard row</td><td>inspect it; <kbd>Esc</kbd> goes back</td></tr>
+        <tr><td>drag the timeline</td><td>scrub to any moment</td></tr>
+        <tr><td><kbd>Space</kbd> · <kbd>←</kbd>/<kbd>→</kbd> · <kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd></td><td>play/pause · ±1 day · ±1 hour</td></tr>
+        <tr><td><kbd>1</kbd>–<kbd>6</kbd>, <kbd>↑</kbd>/<kbd>↓</kbd></td><td>speed, from 1 hour to 2 weeks per second</td></tr>
+        <tr><td><kbd>A</kbd></td><td>the agent lens: colour beams by human, bot or AI agent</td></tr>
+        <tr><td><kbd>R</kbd></td><td>record a video clip of the year</td></tr>
+        <tr><td><kbd>Home</kbd> · <kbd>End</kbd> · <kbd>O</kbd> · <kbd>L</kbd> · <kbd>H</kbd> · <kbd>F</kbd></td><td>start · now · auto-orbit · labels · hide UI · focus the hovered repo</td></tr>
+      </table></div>
+    </section>
+
+    <section id="agents">
+      <h2>The agent lens</h2>
+      <p>A growing share of commits are written by AI agents and automation. commit.city classifies every commit it replays as <b style="color:var(--human)">human</b>,
+        <b style="color:var(--bot)">bot</b> or a specific <b style="color:var(--agent)">AI agent</b>, from the signatures they leave in git and on GitHub:</p>
+      <ul>
+        <li><b>The commit author.</b> Agents that commit under their own account, like <code>copilot-swe-agent[bot]</code> or <code>devin-ai-integration[bot]</code>.</li>
+        <li><b>Co-authored-by trailers.</b> Claude Code, Cursor, Copilot and others add one when they help write a commit.</li>
+        <li><b>Message footers</b>, like Claude Code's “Generated with Claude Code” or Aider's <code>aider:</code> prefix.</li>
+        <li><b>On the live view</b>, the account behind an event and agent branch names like <code>claude/…</code> or <code>copilot/…</code>.</li>
+      </ul>
+      <p>Automation that isn't an AI agent (Dependabot, Renovate, GitHub Actions and other <code>[bot]</code> accounts) counts as <b>bot</b>. Everything else is human.</p>
+      <div class="callout agent"><b>Disclosed work only.</b> The lens can only see what agents sign. Code an agent wrote that a person committed without a trailer looks human, so read the agent share as a floor, not an exact figure. The rules are open: <a href="https://github.com/azank1/commit-city/blob/main/schema/agents.json">schema/agents.json</a>, and pull requests for new agents are welcome.</div>
+      <h3>Agents it recognises</h3>
+      {{agentsTable}}
+      <p>Press <kbd>A</kbd> in any city to colour the beams by who sent them. The panel then breaks the year down by agent, and the timeline splits by author.</p>
+    </section>
+
+    <section id="live">
+      <h2>GitHub, live</h2>
+      <p><a href="/events">commit.city/events</a> turns GitHub's public timeline into a city in real time. Every repo that shows up gets a tower, every push, pull request, issue, star, fork and release drops in as a beam,
+        and repos that go quiet sink away after a few minutes. The panel keeps a running count of humans, bots and agents.</p>
+      <p>GitHub publishes its public timeline a few minutes behind, as a sample of everything happening, so the view runs a few minutes behind real time too. It shows public activity only.</p>
+    </section>
+
+    <section id="sharing">
+      <h2>Sharing</h2>
+      <h3>README card</h3>
+      <p>A self-contained SVG with your skyline, stats and language mix. Make one on the <a href="/readme">README card page</a>, or use:</p>
+      <div class="code"><pre>[![my city](https://commit.city/api/card?t=YOU)](https://commit.city/YOU)</pre><button class="copy" data-copy="[![my city](https://commit.city/api/card?t=YOU)](https://commit.city/YOU)">Copy</button></div>
+      <h3>Video</h3>
+      <p>Press <b>Record</b> (or <kbd>R</kbd>) in any city to render a short clip of the year playing back, in 16:9, 9:16 or 1:1. It renders entirely in your browser: MP4 where the browser supports it, otherwise WebM.</p>
+      <h3>Link previews and moments</h3>
+      <p>Every city has a link preview image, so pasting <code>commit.city/you</code> anywhere unfurls into your skyline. <b>Share → copy this moment</b> gives a link that reopens at the same date, speed and camera angle.</p>
+    </section>
+
+    <section id="privacy">
+      <h2>Privacy</h2>
+      <ul>
+        <li><b>Public data only.</b> The builder reads public repositories with a token that can't see anything private. Private repos never appear on commit.city.</li>
+        <li><b>No source code is kept.</b> A city stores file paths, line counts and timestamps, all things anyone can already see on GitHub. Repo records are cached so the next visitor doesn't rebuild them.</li>
+        <li><b>No ads, no trackers, no analytics cookies.</b> A cookie is set only if you sign in, to remember who you are.</li>
+        <li><b>Sign-in asks for no permissions.</b> It proves you own an account, so you can manage its city. Builds you start then use your own GitHub API quota.</li>
+      </ul>
+    </section>
+
+    <section id="opt-out">
+      <h2>Hiding your city</h2>
+      <p>Open your city, press <b>Share</b>, then <b>Sign in with GitHub</b>. You can leave individual repos out of your city, or hide it entirely. Hiding deletes your city and your repo cities and keeps them from being rebuilt.
+        Org owners who want an org city hidden can <a href="https://github.com/azank1/commit-city/issues/new?title=Hide%20an%20org%20city">open an issue</a>.</p>
+    </section>
+
+    <section id="limits">
+      <h2>Limits</h2>
+      <div class="tablewrap"><table>
+        <tr><th>Rule</th><th>commit.city</th><th>Action / CLI</th></tr>
+        <tr><td>Window</td><td>the last 365 days, or everything with <code>?all=1</code> on a repo</td><td><code>since</code>, default 365 days</td></tr>
+        <tr><td>People</td><td>top 50 repos by your commits</td><td>top 60 (<code>max_repos</code>)</td></tr>
+        <tr><td>Orgs</td><td>the 24 busiest repos</td><td>n/a</td></tr>
+        <tr><td>Repo size</td><td>up to ~1.5 GB on disk</td><td>no limit</td></tr>
+        <tr><td>Big repos</td><td colspan="2">the deepest folders fold into one building until a repo fits 2,500 files (60,000 across a city)</td></tr>
+        <tr><td>Skipped paths</td><td colspan="2"><code>node_modules</code>, <code>dist</code>, <code>vendor</code>, virtualenvs, caches, lockfiles, <code>*.min.js</code>, <code>*.map</code></td></tr>
+        <tr><td>Binary files</td><td colspan="2">count as 12 lines</td></tr>
+      </table></div>
+    </section>
+
+    <section id="self-host">
+      <h2>Private repos: run it yourself</h2>
+      <p>The same pipeline ships as a <b>GitHub Action</b> and a dependency-free <b>Python CLI</b>. Both write one self-contained HTML page (three.js, your data and your avatar inlined) that you can host anywhere. Private repos are opt-in and always anonymised: they show as <code>private/repo-N</code>, every path is renamed, and only sizes and timing stay real.</p>
+      <h3>Template + Action</h3>
+      <ol>
+        <li>Click <a href="https://github.com/new?template_name=commit-city&amp;template_owner=azank1">Use this template</a> and create a repo (any name).</li>
+        <li>In the new repo, set <b>Settings → Pages → Source</b> to <b>GitHub Actions</b>.</li>
+        <li>Run <b>Actions → commit-city → Run workflow</b>. It then rebuilds every week and only re-reads repos that moved.</li>
+        <li>Open <code>https://&lt;you&gt;.github.io/&lt;repo&gt;/</code>.</li>
+      </ol>
+      <p>To include private repos, set <code>include_private = true</code> in <code>commit-city.toml</code> and add a fine-grained token with read-only <b>Contents</b> and <b>Metadata</b> as the <code>COMMIT_CITY_TOKEN</code> secret.</p>
+      <h3>Command line</h3>
+      <div class="code"><pre>pipx install git+https://github.com/azank1/commit-city
+commit-city build --login YOU --out my-city.html            <span class="c"># public repos</span>
+GH_TOKEN=... commit-city build --login YOU --include-private  <span class="c"># plus private, anonymised</span></pre><button class="copy" data-copy="pipx install git+https://github.com/azank1/commit-city">Copy</button></div>
+    </section>
+
+    <section id="api">
+      <h2>API &amp; embeds</h2>
+      <div class="tablewrap"><table>
+        <tr><th>Endpoint</th><th>Returns</th></tr>
+        <tr><td><code>/api/card?t=…</code></td><td>The README card, SVG. <code>theme=light</code>, <code>animate=0</code>, <code>all=1</code>.</td></tr>
+        <tr><td><code>/api/og?t=…</code></td><td>The 1200×630 link-preview image, PNG.</td></tr>
+        <tr><td><code>/api/city?t=…</code></td><td>A city's status and metadata (JSON): <code>ready</code>, <code>missing</code> or <code>hidden</code>, with stats and the human/bot/agent split.</td></tr>
+        <tr><td><code>/api/live</code></td><td>The latest public GitHub events, compacted and classified (JSON).</td></tr>
+      </table></div>
+      <h3>Embedding a city</h3>
+      <div class="code"><pre>&lt;iframe src="https://commit.city/you#embed=1" width="100%" height="480" style="border:0"&gt;&lt;/iframe&gt;</pre><button class="copy" data-copy='&lt;iframe src="https://commit.city/you#embed=1" width="100%" height="480" style="border:0"&gt;&lt;/iframe&gt;'>Copy</button></div>
+      <p>Hash parameters work on every city URL:</p>
+      <div class="tablewrap"><table>
+        <tr><th>Parameter</th><th>Effect</th></tr>
+        <tr><td><code>t=2026-03-14</code> or <code>t=2026-03-14T21:30</code></td><td>open at that moment (<code>t=end</code> for now)</td></tr>
+        <tr><td><code>speed=1h|6h|1d|3d|1w|2w</code></td><td>playback speed per second</td></tr>
+        <tr><td><code>play=0</code> · <code>orbit=0</code> · <code>hud=0</code></td><td>start paused · no auto-orbit · no panels</td></tr>
+        <tr><td><code>focus=owner/repo</code></td><td>start focused on a repo</td></tr>
+        <tr><td><code>lens=agents</code></td><td>start with the agent lens on</td></tr>
+        <tr><td><code>embed=1</code></td><td>embedded mode: no site bar, scroll doesn't zoom until clicked</td></tr>
+      </table></div>
+      <p>The payload format is versioned and documented: <a href="https://github.com/azank1/commit-city/blob/main/schema/lapse.schema.json">schema/lapse.schema.json</a>.</p>
+    </section>
+
+    <section id="how">
+      <h2>How it's built</h2>
+      <div class="flow">
+        <div><b>Discover</b><small>GitHub's GraphQL API finds the repos, the window and, for a person, which commits are theirs.</small></div>
+        <div><b>Replay</b><small>Each repo is replayed from git itself over GitHub's smart-HTTP protocol v2, no git binary, no disk.</small></div>
+        <div><b>Cache</b><small>Repo records are keyed by head commit and shared by every city that includes the repo.</small></div>
+        <div><b>Render</b><small>A three.js viewer draws instanced towers, beams, bloom and a day-night sky.</small></div>
+      </div>
+      <p>The hosted builder runs as serverless functions. A shallow fetch with <code>deepen-since</code> pulls just the window's commits, and a partial <code>filter blob:limit=128k</code> holds back big blobs (binaries are recognised by name; big text files come in one follow-up fetch).
+        A small pack parser and tree differ replay the first-parent history, tracking every file's existence and line count. Your browser drives the build (start, one call per repo, finish), so no function has to outlive its time limit and you get to watch it come together.</p>
+      <p>Parity is tested: the TypeScript engine is checked against a Python replay that uses a real <code>git clone</code> and <code>numstat</code>, on synthetic repos covering renames, merges, symlinks, binaries, <code>.gitattributes</code>, timezones and agent signatures, and on real repos. Everything is open source: <a href="https://github.com/azank1/commit-city">github.com/azank1/commit-city</a>.</p>
+    </section>
+
+    <section id="faq">
+      <h2>FAQ</h2>
+      <h3>Is this affiliated with GitHub?</h3>
+      <p>No. commit.city is an independent, MIT-licensed project. GitHub is a trademark of GitHub, Inc.</p>
+      <h3>A build failed or looks wrong. What now?</h3>
+      <p>Retry from the city page; repo records already built are kept. If it keeps failing, <a href="https://github.com/azank1/commit-city/issues/new">open an issue</a> with the URL.</p>
+      <h3>Can I use it for my team or company?</h3>
+      <p>For public repos, just use the org URL. For private code, run the Action in your own org: nothing leaves your GitHub, and the page it publishes is yours to host where you like.</p>
+      <h3>Who made this?</h3>
+      <p><a href="https://github.com/azank1">azank1</a>, with three.js, the Inter and JetBrains Mono typefaces, and resvg. Contributions are welcome.</p>
+    </section>
+  </article>
+</div>
+</main>
+<script type="module">
+// highlight the section being read
+const links = [...document.querySelectorAll('.toc a')];
+const io = new IntersectionObserver(es => {
+  for (const e of es) if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === `#${e.target.id}`));
+}, { rootMargin: '-20% 0px -70% 0px' });
+document.querySelectorAll('.prose section').forEach(s => io.observe(s));
+</script>

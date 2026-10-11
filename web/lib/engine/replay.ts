@@ -6,14 +6,16 @@ import { binaryByName, langOf } from './langs.js';
 import { type Commit, type ObjectDB, type TreeEntry, parseTree } from './pack.js';
 
 export const BINARY_SIZE = 12;          // a binary file stands in as a 12-line file
+export const RECORD_VERSION = 2;        // bump when records change shape: cached records of another version are misses
 const MAX_COMMITS = 20000;              // per-repo cap on recorded commit touch lists
 const MAX_TOUCH = 300;
 
-/** [sha12, author minute, author UTC offset, is merge (0|1), files touched, first 300 file indexes] */
-export type CommitTouch = [string, number, number, number, number, number[]];
+/** [sha12, author minute, author UTC offset, is merge (0|1), files touched, first 300 file indexes, who] where who
+ *  is '' (human), 'bot' or an agent id (agents.ts) */
+export type CommitTouch = [string, number, number, number, number, number[], string];
 
 export interface RepoRecord {
-  v: 1;
+  v: typeof RECORD_VERSION;
   repo: string;
   head: string;
   start: number;          // window start, unix seconds
@@ -193,11 +195,11 @@ export class Replayer {
       const idx = new Set<number>();
       for (const ch of changes) { const k = index.get(ch.path); if (k !== undefined) idx.add(k); }
       const files = [...idx].sort((a, b) => a - b);
-      commits.push([c.sha.slice(0, 12), Math.floor(c.at / 60), c.atOff, c.parents.length > 1 ? 1 : 0, files.length, files.slice(0, MAX_TOUCH)]);
+      commits.push([c.sha.slice(0, 12), Math.floor(c.at / 60), c.atOff, c.parents.length > 1 ? 1 : 0, files.length, files.slice(0, MAX_TOUCH), c.who]);
     }
     commits.sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1));
     return {
-      v: 1, repo, head, start, base_t: baseT, fp_commits: chain.length,
+      v: RECORD_VERSION, repo, head, start, base_t: baseT, fp_commits: chain.length,
       files: paths.map(p => [p, langOf(p), events.get(p)!]),
       commits,
       ...(partial ? { partial } : {}),

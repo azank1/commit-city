@@ -7,6 +7,8 @@ Rules applied here, in order:
      file budget (max_files_per_repo, then shrunk evenly so the whole city fits max_files_total)
   4. times become minutes since `epoch`, local midnight (detected or configured timezone) of the day
      before your first commit in the window
+  5. each commit row carries who wrote it (agents.py): a human row is [t, n, idx], any other appends w, its
+     index into the top-level `who` list
 """
 import fnmatch
 import json
@@ -15,7 +17,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 from . import SCHEMA_VERSION, __version__
-from .extract import LANG_CLASSES
+from .extract import LANG_CLASSES, RECORD_VERSION
 
 
 def detect_offset(records):
@@ -32,6 +34,12 @@ def tz_info(cfg, records, now):
     off = detect_offset(records)
     sign = '+' if off >= 0 else '-'
     return {'iana': '', 'offset': off, 'label': f'UTC{sign}{abs(off) // 60:02d}:{abs(off) % 60:02d}'}
+
+
+def actors(records):
+    """'human', then 'bot' if any of these commits is one, then agent ids by commit count (ties by id)."""
+    n = Counter(m[5] for r in records for m in r['mine'] if m[5])
+    return ['human'] + (['bot'] if 'bot' in n else []) + sorted((k for k in n if k != 'bot'), key=lambda k: (-n[k], k))
 
 
 def merge_events(evs):
@@ -135,6 +143,8 @@ def build(found, cfg, cache, log):
         if os.path.exists(path):
             with open(path) as f:
                 r = json.load(f)
+            if r.get('v') != RECORD_VERSION:                          # an older record shape: not drawable
+                continue
             wanted = {s[:12] for s in found['repos'][name]['shas']}
             r['mine'] = [m for m in r['mine'] if m[4] in wanted]      # cached records may predate the window
             if r['mine'] and r['files']:
@@ -154,6 +164,8 @@ def build(found, cfg, cache, log):
                max(f[2][-2] for r in records for f in r['files']))
     t_end = max(last + 30, now // 60) - epoch_min
     caps = budget_caps([len(r['files']) for r in records], cfg.max_files_per_repo, cfg.max_files_total)
+    who = actors(records)
+    widx = {k: i for i, k in enumerate(who)}
     repos, k_anon = [], 0
     for r, cap in zip(records, caps):
         files, remap = aggregate(r['files'], cap)
@@ -165,9 +177,9 @@ def build(found, cfg, cache, log):
         else:
             name = r['repo']
         mine = []
-        for t, _, _, idx, _ in r['mine']:
+        for t, _, _, idx, _, w in r['mine']:
             new = sorted({remap[i] for i in idx})
-            mine.append([t - epoch_min, len(new), new])
+            mine.append([t - epoch_min, len(new), new] + ([widx[w]] if w else []))
         repos.append({
             'n': name, 'fork': r['fork'] and not anon, 'anon': anon, 'fp': r['fp_commits'],
             'agg': len(r['files']) - len(files),
@@ -190,6 +202,7 @@ def build(found, cfg, cache, log):
         'epoch': epoch_min * 60,
         't_end': t_end,
         'langs': LANG_CLASSES,
+        'who': who,
         'totals': {
             'commits': commits,
             'contributions': found.get('contributions'),

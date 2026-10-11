@@ -2,6 +2,7 @@
 // depth-first, hash, and keep only what the replay needs (commit headers, raw trees, blob line counts).
 import { createHash } from 'node:crypto';
 import { inflateSync } from 'node:zlib';
+import { classify, identOf } from './agents.js';
 
 export interface Commit {
   sha: string;
@@ -10,6 +11,7 @@ export interface Commit {
   at: number;            // author time, unix seconds
   atOff: number;         // author UTC offset, minutes east
   ct: number;            // committer time, unix seconds
+  who: string;           // '' human, 'bot', or an agent id (agents.ts); the identity and message are not kept
 }
 
 export interface BlobInfo { lines: number; bin: boolean }
@@ -134,11 +136,13 @@ const PERSON = /> (-?\d+) ([+-])(\d\d)(\d\d)\s*$/;
 export function parseCommit(sha: string, data: Buffer): Commit {
   const end = data.indexOf('\n\n');
   const head = data.toString('utf8', 0, end < 0 ? data.length : end);
-  const c: Commit = { sha, tree: '', parents: [], at: 0, atOff: 0, ct: 0 };
+  const c: Commit = { sha, tree: '', parents: [], at: 0, atOff: 0, ct: 0, who: '' };
+  let author = '';
   for (const line of head.split('\n')) {
     if (line.startsWith('tree ')) c.tree = line.slice(5, 45);
     else if (line.startsWith('parent ')) c.parents.push(line.slice(7, 47));
     else if (line.startsWith('author ')) {
+      author = line.slice(7);
       const m = PERSON.exec(line);
       if (m) { c.at = Number(m[1]); c.atOff = (Number(m[3]) * 60 + Number(m[4])) * (m[2] === '-' ? -1 : 1); }
     } else if (line.startsWith('committer ')) {
@@ -146,6 +150,8 @@ export function parseCommit(sha: string, data: Buffer): Commit {
       if (m) c.ct = Number(m[1]);
     }
   }
+  // the message is everything after the header, as git's %B prints it
+  c.who = classify(identOf(author), end < 0 ? '' : data.toString('utf8', end + 2));
   return c;
 }
 

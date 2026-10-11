@@ -1,8 +1,8 @@
-// Link previews: /api/og?t=<target>[&all=1][&v=<city version>] -> 1200x630 PNG.
+// Link previews: /api/og?t=<target>[&all=1][&v=<city version>] -> 1200x630 PNG; /api/og[?page=events|explore|...] for the site's own pages.
 import { Resvg } from '@resvg/resvg-js';
 import path from 'node:path';
 import { avatarUri } from '../lib/avatar.js';
-import { ogSVG } from '../lib/card.js';
+import { ogSVG, siteOgSVG } from '../lib/card.js';
 import { type CityMeta, readMeta, readSettings, readSky } from '../lib/city.js';
 import { handle } from '../lib/http.js';
 import { cityKey, parseTarget, wantsWhole } from '../lib/target.js';
@@ -11,6 +11,13 @@ const FONTS = ['Inter-Regular.ttf', 'Inter-Bold.ttf'].map(f => path.join(process
 
 export const GET = handle(async req => {
   const u = new URL(req.url);
+  if (!u.searchParams.get('t')) {
+    const png = new Resvg(siteOgSVG(u.searchParams.get('page') ?? 'home'), {
+      fitTo: { mode: 'width', value: 1200 },
+      font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: 'Inter' },
+    }).render().asPng();
+    return new Response(new Uint8Array(png), { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600, s-maxage=86400' } });
+  }
   let target;
   try { target = parseTarget(u.searchParams.get('t')); } catch { target = null; }
   const name = !target ? 'commit.city' : target.kind === 'owner' ? target.login : `${target.owner}/${target.name}`;

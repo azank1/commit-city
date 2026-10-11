@@ -7,7 +7,9 @@ export const SCHEMA_VERSION = 1;
 export const GENERATOR = 'commit.city 0.2.0';
 
 type File = [string, number, number[]];
-type Mine = [number, number, number, number[], string];   // [author minute, offset, n files, file idx, sha12]
+type Mine = [number, number, number, number[], string, string];   // [author minute, offset, n files, file idx, sha12, who]
+/** A commit row: [t, n files, file idx], plus w (index into Payload.who, >= 1) when not by a human. */
+export type MineRow = [number, number, number[]] | [number, number, number[], number];
 
 export interface BundleRepo { name: string; fork: boolean; record: RepoRecord; mine: Mine[] }
 
@@ -38,16 +40,17 @@ export interface Payload {
   title: string;
   tz: { iana: string; offset: number; label: string };
   epoch: number; t_end: number; langs: string[];
+  who: string[];                    // actors in this city: 'human', then 'bot' if any, then agent ids by commit count
   totals: { commits: number; contributions: number | null; restricted: number; window_start: string; omitted_repos: number; omitted_commits: number };
-  repos: { n: string; fork: boolean; anon: boolean; fp: number; agg: number; p: string[]; l: number[]; e: number[][]; m: [number, number, number[]][] }[];
+  repos: { n: string; fork: boolean; anon: boolean; fp: number; agg: number; p: string[]; l: number[]; e: number[][]; m: MineRow[] }[];
 }
 
 /** Commit touches -> the Python `mine` rows, for one author's commits or for everyone's. */
 export function mineOf(rec: RepoRecord, filter: { shas?: Set<string>; since?: number }): Mine[] {
   const out: Mine[] = [];
-  for (const [sha, at, off, merge, n, files] of rec.commits) {
+  for (const [sha, at, off, merge, n, files, who] of rec.commits) {
     if (filter.shas ? !filter.shas.has(sha) : merge === 1 || (filter.since != null && at * 60 < filter.since)) continue;
-    out.push([at, off, n, files, sha]);
+    out.push([at, off, n, files, sha, who]);
   }
   out.sort(pyListCmp);                                      // Python's list ordering, as in extract.replay
   return out;
@@ -59,7 +62,7 @@ function pyListCmp(a: Mine, b: Mine): number {
   if (a[2] !== b[2]) return a[2] - b[2];
   for (let i = 0; i < Math.min(a[3].length, b[3].length); i++) if (a[3][i] !== b[3][i]) return a[3][i] - b[3][i];
   if (a[3].length !== b[3].length) return a[3].length - b[3].length;
-  return a[4] < b[4] ? -1 : a[4] > b[4] ? 1 : 0;
+  return pyCmp(a[4], b[4]) || pyCmp(a[5], b[5]);
 }
 
 export function detectOffset(repos: BundleRepo[]): number {
@@ -152,6 +155,14 @@ export function budgetCaps(counts: number[], perRepo: number, total: number): nu
 
 const isoDay = (s: number) => new Date(s * 1000).toISOString().slice(0, 10);
 
+/** 'human', then 'bot' if any of these commits is one, then agent ids by commit count (ties by id). */
+export function actors(repos: BundleRepo[]): string[] {
+  const n = new Map<string, number>();
+  for (const r of repos) for (const m of r.mine) if (m[5]) n.set(m[5], (n.get(m[5]) ?? 0) + 1);
+  const agents = [...n.keys()].filter(k => k !== 'bot').sort((a, b) => n.get(b)! - n.get(a)! || pyCmp(a, b));
+  return ['human', ...(n.has('bot') ? ['bot'] : []), ...agents];
+}
+
 export function bundle(inp: BundleInput): Payload {
   let records = inp.repos.filter(r => r.mine.length && r.record.files.length);
   if (!records.length) throw new Error('no repos with commits in the window; nothing to draw');
@@ -170,11 +181,13 @@ export function bundle(inp: BundleInput): Payload {
   const epochMin = (localDay - 1) * 1440 - off;              // local midnight, the day before the first commit
   const tEnd = Math.max(last + 30, Math.floor(inp.now / 60)) - epochMin;
   const caps = budgetCaps(records.map(r => r.record.files.length), inp.maxFilesPerRepo ?? 2500, inp.maxFilesTotal ?? 60000);
+  const who = actors(records);
+  const widx = new Map(who.map((k, i) => [k, i]));
   const repos = records.map((r, k) => {
     const [files, remap] = aggregate(r.record.files, caps[k]);
-    const m = r.mine.map(([t, , , idx]) => {
+    const m = r.mine.map(([t, , , idx, , w]): MineRow => {
       const nw = [...new Set(idx.map(i => remap[i]))].sort((a, b) => a - b);
-      return [t - epochMin, nw.length, nw] as [number, number, number[]];
+      return w ? [t - epochMin, nw.length, nw, widx.get(w)!] : [t - epochMin, nw.length, nw];
     });
     return {
       n: r.name, fork: r.fork, anon: false, fp: r.record.fp_commits, agg: r.record.files.length - files.length,
@@ -194,6 +207,7 @@ export function bundle(inp: BundleInput): Payload {
     epoch: epochMin * 60,
     t_end: tEnd,
     langs: LANG_CLASSES,
+    who,
     totals: {
       commits: repos.reduce((a, r) => a + r.m.length, 0),
       contributions: inp.contributions,

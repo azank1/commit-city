@@ -37,16 +37,20 @@ export class Repo {
     return this;
   }
   symlink(target: string, p: string): this { fs.symlinkSync(target, path.join(this.dir, p)); return this; }
+  /** author is a name (the email is made up from it) or a full `Name <email>`. */
   env(ts: number, author: string, tz: string, cts?: number): Record<string, string> {
+    const m = /^(.*) <(.*)>$/.exec(author);
+    const [name, email] = m ? [m[1], m[2]] : [author, `${author.toLowerCase()}@x.test`];
     return {
       GIT_AUTHOR_DATE: `${ts} ${tz}`, GIT_COMMITTER_DATE: `${cts ?? ts} ${tz}`,
-      GIT_AUTHOR_NAME: author, GIT_AUTHOR_EMAIL: `${author.toLowerCase()}@x.test`,
-      GIT_COMMITTER_NAME: author, GIT_COMMITTER_EMAIL: `${author.toLowerCase()}@x.test`,
+      GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: email,
     };
   }
-  commit(ts: number, author = 'Ann', tz = '+0000', cts?: number): string {
+  /** msg, when given, is kept verbatim (CRs, trailers and all). */
+  commit(ts: number, author = 'Ann', tz = '+0000', cts?: number, msg?: string): string {
     sh(this.dir, ['git', 'add', '-A']);
-    sh(this.dir, ['git', 'commit', '-q', '--allow-empty', '-m', `c${ts}`], this.env(ts, author, tz, cts));
+    sh(this.dir, ['git', 'commit', '-q', '--allow-empty', ...(msg === undefined ? ['-m', `c${ts}`] : ['--cleanup=verbatim', '-m', msg])],
+      this.env(ts, author, tz, cts));
     return this.head();
   }
   checkout(...args: string[]): this { sh(this.dir, ['git', 'checkout', '-q', ...args]); return this; }
@@ -86,7 +90,8 @@ export function localTransport(gitDir: string, log?: string[]): Transport {
 export interface PyRecord {
   head: string; fp_commits: number; base_t: number | null;
   files: [string, number, number[]][];
-  mine: [number, number, number, number[], string][];
+  v: number;
+  mine: [number, number, number, number[], string, string][];     // ..., sha12, who
 }
 
 /** The reference implementation: commit_city.extract.replay on a bare clone. */

@@ -18,7 +18,7 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.gz': 'application/gzip', '.txt': 'text/plain; charset=utf-8',
-  '.ico': 'image/x-icon', '.xml': 'application/xml', '.webmanifest': 'application/manifest+json' };
+  '.ico': 'image/x-icon', '.xml': 'application/xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.webp': 'image/webp', '.mp4': 'video/mp4' };
 
 const rewrites = config.rewrites.map(r => { const keys = []; return { re: pathToRegexp(r.source, keys), keys, dest: r.destination }; });
 const headerRules = (config.headers || []).map(h => ({ re: pathToRegexp(h.source), headers: h.headers }));

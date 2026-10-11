@@ -1,0 +1,13 @@
+{
+  "name": "commit.city",
+  "short_name": "commit.city",
+  "description": "Your GitHub, as a living city.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04060c",
+  "theme_color": "#04060c",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

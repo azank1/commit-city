@@ -4,7 +4,7 @@ import { HttpError } from './http.js';
 
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 const REPO = /^[A-Za-z0-9._-]{1,100}$/;
-export const RESERVED = new Set(['api', 'v', 's', 'u']);
+export const RESERVED = new Set(['api', 'v', 's', 'u', 'explore', 'events', 'readme', 'about']);   // site paths; GitHub reserves the page names too
 
 export function parseTarget(raw: string | null): Target {
   const t = (raw ?? '').trim().replace(/^\/+|\/+$/g, '').replace(/\.git$/, '');

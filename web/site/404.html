@@ -1,0 +1,26 @@
+<!--page {
+  "title": "Not found · commit.city",
+  "description": "No street by that name. Cities live at commit.city/<user> or commit.city/<owner>/<repo>.",
+  "path": "/404",
+  "sitemap": false
+}-->
+<style>
+.nf { min-height: calc(100vh - var(--nav-h) - 200px); display: grid; place-items: center; text-align: center; padding: 64px 0; }
+.nf .big { display: inline-flex; font: 700 clamp(72px, 14vw, 140px)/1 var(--mono); letter-spacing: -0.06em; background: linear-gradient(180deg, #e8eef7, #2c4a6e); -webkit-background-clip: text; background-clip: text; color: transparent; border: 0; }
+.nf p { color: var(--ink-2); max-width: 520px; margin: 14px auto 26px; }
+.nf form.omni { width: min(560px, 100%); margin: 0 auto; text-align: left; }
+.lot { margin: 0 auto 8px; width: 180px; }
+</style>
+<main class="nf">
+  <div class="wrap">
+    <svg class="lot" viewBox="0 0 180 100" aria-hidden="true"><path d="M90 30l70 35-70 35-70-35z" fill="#0e1522" stroke="rgba(95,211,243,.3)" stroke-dasharray="4 5"/><path d="M90 52l18 9-18 9-18-9z" fill="#1c2537"/><text x="90" y="64" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#7f8ca2">empty lot</text></svg>
+    <div class="big">404</div>
+    <p>No street by that name. Cities live at <span class="mono">commit.city/&lt;user&gt;</span> or <span class="mono">commit.city/&lt;owner&gt;/&lt;repo&gt;</span>. Where were you headed?</p>
+    <form class="omni" data-omni role="search" autocomplete="off">
+      <label class="pre" for="q">commit.city/</label><img class="av" alt="" hidden>
+      <input id="q" type="text" placeholder="username or owner/repo" autocapitalize="off" spellcheck="false" aria-label="GitHub user, org or owner/repo" autofocus>
+      <button class="btn primary go" type="submit">Go <span class="arrow">→</span></button>
+    </form>
+    <p style="margin-top:26px"><a href="/">Home</a> · <a href="/explore">Explore cities</a> · <a href="/events">GitHub, live</a></p>
+  </div>
+</main>

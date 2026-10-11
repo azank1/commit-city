@@ -1,6 +1,6 @@
 /* commit.city chrome around the viewer: brand bar, share sheet, builder overlay. Uses the viewer's tokens. */
 .cc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-body.bare #cc-bar, body.bare #cc-sheet, body.embed #cc-bar, body.embed #unbare { display: none !important; }
+body.bare #cc-bar, body.bare #cc-sheet, body.embed #cc-bar, body.embed #unbare, body.rec #cc-bar, body.rec #cc-sheet { display: none !important; }
 
 #cc-bar {
   position: fixed; z-index: 40; top: max(14px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
@@ -25,6 +25,9 @@ body.bare #cc-bar, body.bare #cc-sheet, body.embed #cc-bar, body.embed #unbare {
 .cc-star b { color: #ffd479; font-weight: 600; }
 .cc-me { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); }
 .cc-age { color: var(--muted); font-size: 11.5px; padding: 0 4px; }
+.cc-link { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border-radius: 99px; color: var(--ink-2); font-size: 12.5px; text-decoration: none; }
+.cc-link:hover { color: var(--ink); background: rgba(255, 255, 255, 0.07); }
+.cc-live { width: 6px; height: 6px; border-radius: 50%; background: #4fd18b; box-shadow: 0 0 8px #4fd18b; }
 
 #cc-sheet {
   position: fixed; z-index: 41; top: calc(max(14px, env(safe-area-inset-top, 0px)) + 50px); left: 50%; transform: translateX(-50%);
@@ -71,6 +74,7 @@ body.bare #cc-bar, body.bare #cc-sheet, body.embed #cc-bar, body.embed #unbare {
 .cc-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .cc-sub { color: var(--ink-2); font-size: 13px; line-height: 1.55; margin: 14px 0 0; }
 .cc-sub b { color: var(--ink); }
+.cc-sub a { color: var(--accent); }
 .cc-bar2 { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.07); overflow: hidden; margin: 18px 0 6px; }
 .cc-bar2 i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #2c8fd6, var(--accent)); box-shadow: 0 0 18px rgba(95, 211, 243, 0.6); transition: width 0.5s ease; }
 .cc-bar2.indet i { width: 30%; animation: cc-indet 1.3s ease-in-out infinite; }
@@ -101,6 +105,7 @@ li[data-s="bad"] .st { color: #f0a0a0; }
 .cc-err { margin-top: 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(230, 103, 103, 0.35); background: rgba(230, 103, 103, 0.08); color: #f3c4c4; font-size: 12.5px; line-height: 1.5; }
 
 @media (max-width: 1180px) { .cc-go { display: none; } }
+@media (max-width: 640px) { .cc-link { display: none; } }
 @media (max-width: 900px) {
   #cc-bar { left: 16px; right: 16px; transform: none; justify-content: space-between; padding-left: 10px; }
   #clock { top: calc(max(14px, env(safe-area-inset-top, 0px)) + 50px); }

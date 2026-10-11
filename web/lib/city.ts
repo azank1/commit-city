@@ -2,7 +2,7 @@
 import { bundle, mineOf, type Payload } from './engine/bundle.js';
 import { discover, type Discovery, NotFound, RateLimited, type Target } from './engine/discover.js';
 import { GitError } from './engine/git.js';
-import type { RepoRecord } from './engine/replay.js';
+import { RECORD_VERSION, type RepoRecord } from './engine/replay.js';
 import { replayRepo } from './engine/repo.js';
 import { HttpError } from './http.js';
 import { sign, verify } from './secret.js';
@@ -10,7 +10,9 @@ import { type Sky, skyline } from './skyline.js';
 import { getJSON, getStore, putJSON } from './store.js';
 import { cityKey } from './target.js';
 
-export const repoPath = (name: string, head: string, whole: boolean) => `repos/${name.toLowerCase()}/${head}${whole ? '.all' : ''}.json.gz`;
+// the record version is part of the key, so records of an older shape are cache misses and get replayed again
+export const repoPath = (name: string, head: string, whole: boolean) =>
+  `repos/${name.toLowerCase()}/${head}${whole ? '.all' : ''}.v${RECORD_VERSION}.json.gz`;
 export const metaPath = (key: string) => `meta/${key}.json`;
 export const cityPath = (key: string, v: number) => `cities/${key}/${v}.json.gz`;
 export const settingsPath = (login: string) => `settings/${login.toLowerCase()}.json`;
@@ -33,6 +35,7 @@ export interface CityMeta {
   window_start: string;
   top: string[];                  // the biggest islands, for cards and the gallery
   langs: number[];                // lines per language class at the end of the window
+  who: { human: number; bot: number; agent: number; agents: [string, number][] };   // commits by actor (agents by count)
 }
 
 /** The city in miniature (cards, link previews), stored beside each version. */
@@ -40,7 +43,10 @@ export async function readSky(m: Pick<CityMeta, 'key' | 'v'>): Promise<Sky | nul
   return getJSON<Sky>(skyPath(m.key, m.v)).catch(() => null);
 }
 
-export interface GalleryEntry { key: string; target: string; kind: CityMeta['kind']; avatar: string; commits: number; repos: number; lines: number; v: number }
+export interface GalleryEntry {
+  key: string; target: string; kind: CityMeta['kind']; avatar: string; commits: number; repos: number; lines: number; v: number;
+  agent: number; bot: number;     // shares of the commits, 0..1 to 3 decimals
+}
 export const GALLERY = 'gallery/recent.json';
 const GALLERY_MAX = 60;
 
@@ -148,7 +154,8 @@ export async function buildRepo(ticketToken: string, name: string) {
 export async function finishBuild(ticketToken: string, planToken: string): Promise<CityMeta> {
   const t = verify<Ticket>(ticketToken), p = verify<Plan>(planToken);
   if (!t || !p || t.k !== p.k) throw new HttpError(401, 'build ticket expired; reload the page');
-  const records = await Promise.all(p.r.map(r => getJSON<RepoRecord>(repoPath(r.n, r.h, t.w)).catch(() => null)));
+  const records = await Promise.all(p.r.map(r => getJSON<RepoRecord>(repoPath(r.n, r.h, t.w))
+    .then(rec => (rec?.v === RECORD_VERSION ? rec : null), () => null)));     // another record shape counts as missing
   const repos = p.r.map((r, i) => ({ r, rec: records[i] })).filter(x => x.rec).map(({ r, rec }) => ({
     name: r.n, fork: r.f, record: rec!,
     mine: p.mode === 'mine' ? mineOf(rec!, { shas: new Set(r.sh ?? []) }) : mineOf(rec!, { since: p.s }),
@@ -176,9 +183,17 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
 
 async function addToGallery(m: CityMeta) {
   const list = (await getJSON<GalleryEntry[]>(GALLERY, true)) ?? [];
-  const entry: GalleryEntry = { key: m.key, target: m.target, kind: m.kind, avatar: m.avatar, commits: m.commits, repos: m.repos, lines: m.lines, v: m.v };
-  const next = [entry, ...list.filter(e => e.key !== m.key)].slice(0, GALLERY_MAX);
+  const next = [galleryEntry(m), ...list.filter(e => e.key !== m.key)].slice(0, GALLERY_MAX);
   await putJSON(GALLERY, next, { overwrite: true, maxAge: 60 });
+}
+
+const share = (n: number, total: number) => (total ? Math.round((1000 * n) / total) / 1000 : 0);
+
+export function galleryEntry(m: CityMeta): GalleryEntry {
+  return {
+    key: m.key, target: m.target, kind: m.kind, avatar: m.avatar, commits: m.commits, repos: m.repos, lines: m.lines, v: m.v,
+    agent: share(m.who.agent, m.commits), bot: share(m.who.bot, m.commits),
+  };
 }
 
 export async function removeFromGallery(owner: string) {
@@ -199,9 +214,15 @@ export function summarize(payload: Payload, base: Pick<CityMeta, 'v' | 'key' | '
     });
     return [r.n, s] as const;
   });
+  const byActor = new Array<number>(payload.who.length).fill(0);
+  for (const r of payload.repos) for (const m of r.m) byActor[m[3] ?? 0]++;
+  const agents = payload.who.map((id, i) => [id, byActor[i]] as [string, number]).filter(([id]) => id !== 'human' && id !== 'bot')
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const bot = payload.who.indexOf('bot');
   return {
     ...base, generated: payload.generated, login: payload.user.login, name: payload.user.name, avatar: payload.user.avatar,
     repos: payload.repos.length, commits: payload.totals.commits, files, lines, window_start: payload.totals.window_start,
     top: [...sizes].sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0]), langs,
+    who: { human: byActor[0], bot: bot > 0 ? byActor[bot] : 0, agent: agents.reduce((a, x) => a + x[1], 0), agents },
   };
 }

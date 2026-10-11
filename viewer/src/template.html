@@ -43,7 +43,9 @@ body.bare #unbare { display: inline-flex; }
 
 /* clock + counters */
 #clock { left: 16px; top: max(14px, env(safe-area-inset-top, 0px)); width: 318px; padding: 14px 16px 12px; }
-.kicker { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.kicker { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.kicker span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kicker b { flex: none; }
 .kicker b { color: var(--accent); font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
 #clock-date { font-size: 24px; font-weight: 650; margin-top: 6px; letter-spacing: -0.01em; }
 .clockline { display: flex; gap: 8px; align-items: baseline; color: var(--ink-2); margin-top: 2px; }
@@ -137,9 +139,62 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
 .toast.new { border-color: rgba(95, 211, 243, 0.35); }
 .toast.record { border-color: rgba(255, 210, 120, 0.4); }
 .toast.quiet { color: var(--ink-2); }
+.toast.lens { border-color: rgba(197, 139, 255, 0.45); }
+.toast.live { border-color: rgba(79, 209, 139, 0.45); }
+.livebadge { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.livebadge i { width: 7px; height: 7px; border-radius: 50%; background: #4fd18b; box-shadow: 0 0 8px #4fd18b; animation: recblink 1.6s ease-in-out infinite; }
+.livebadge b { color: #4fd18b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; }
 .toast.out { opacity: 0; transform: translateY(6px); }
 @keyframes tin { from { opacity: 0; transform: translateY(8px); } }
 
+/* who wrote it: the agent lens */
+#whobox { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.wh { display: flex; justify-content: space-between; color: var(--muted); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.wh b { color: #c58bff; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
+.whosplit { display: flex; height: 8px; gap: 2px; margin: 8px 0; border-radius: 4px; overflow: hidden; background: rgba(255, 255, 255, 0.06); }
+.whosplit span { display: block; height: 100%; min-width: 2px; transition: flex-grow 0.3s; }
+#who-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+#who-list li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 40px; gap: 8px; align-items: center; font-size: 12px; }
+#who-list i { width: 8px; height: 8px; border-radius: 50%; }
+#who-list .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#who-list .n { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+#who-list .p { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+body.lens .ticker-wrap { display: none; }
+.f-whol { display: flex; flex-wrap: wrap; gap: 2px 10px; color: var(--ink-2); font-size: 11.5px; }
+.f-whol span { display: inline-flex; align-items: center; gap: 5px; }
+.f-whol i { width: 7px; height: 7px; border-radius: 50%; }
+.tools button.lens.on { border-color: rgba(197, 139, 255, 0.55); }
+.tools button.rec i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ff5a5a; margin-right: 5px; vertical-align: 1px; }
+/* record a clip */
+#recpanel { right: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 86px); width: 316px; max-height: calc(100vh - 140px); overflow-y: auto; padding: 14px 16px; z-index: 3; }
+#recpanel h3 { margin: 0 0 4px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+#recpanel h3 button { color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 4px; }
+#recpanel p { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+#recpanel .lbl { color: var(--muted); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; margin: 12px 0 5px; }
+#recpanel .segs { display: inline-flex; }
+#recpanel .go { width: 100%; margin-top: 14px; height: 38px; border-radius: 10px; background: #ff5a5a; color: #fff; font-weight: 650; font-size: 13px; }
+#recpanel .go:hover { background: #ff7676; }
+#recpanel video { width: 100%; max-height: 46vh; border-radius: 10px; background: #000; display: block; margin: 8px 0 10px; }
+.rec-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.rec-actions a, .rec-actions button { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); color: var(--ink-2); font-size: 12px; text-decoration: none; }
+.rec-actions a:hover, .rec-actions button:hover { color: var(--ink); background: rgba(255, 255, 255, 0.06); }
+.rec-actions .pri { background: var(--accent); color: #04121a; border-color: transparent; font-weight: 650; }
+.rec-actions .pri:hover { background: #8fe6fb; color: #04121a; }
+/* while recording the stage is a viewfinder in the clip's shape */
+body.rec #hud > *:not(#recbar) { display: none !important; }
+body.rec #stage { inset: auto; left: 50%; top: calc(50% + 18px); transform: translate(-50%, -50%); width: var(--rec-w); height: var(--rec-h); border-radius: 4px; overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255, 90, 90, 0.55), 0 0 0 100vmax rgba(0, 0, 0, 0.6); }
+#recbar { display: none; position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); padding: 6px 8px 6px 14px; border-radius: 99px; font-size: 12px; gap: 10px; align-items: center; white-space: nowrap; }
+body.rec #recbar { display: inline-flex; }
+#recbar i { width: 8px; height: 8px; border-radius: 50%; background: #ff5a5a; animation: recblink 1s steps(1) infinite; }
+#recbar span { font-variant-numeric: tabular-nums; }
+#recbar button { padding: 4px 10px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); font-size: 12px; }
+@keyframes recblink { 50% { opacity: 0.2; } }
+/* embedded: a quiet way back to the source */
+.embed-link { position: fixed; right: 12px; bottom: 12px; z-index: 6; display: none; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 99px; background: rgba(6, 10, 18, 0.72);
+  border: 1px solid var(--line); color: var(--ink-2); font-size: 11.5px; text-decoration: none; backdrop-filter: blur(8px); }
+.embed-link:hover { color: var(--ink); border-color: rgba(95, 211, 243, 0.4); }
+body.embed .embed-link { display: inline-flex; }
 /* 3D labels */
 .repo-label { pointer-events: auto; cursor: pointer; display: flex; align-items: baseline; gap: 5px; padding: 3px 8px 3px 7px; border-radius: 99px; background: rgba(6, 10, 18, 0.66); border: 1px solid rgba(255, 255, 255, 0.09); font-size: 11.5px; white-space: nowrap; transition: opacity 0.4s, border-color 0.4s; transform-origin: 50% 100%; }
 .repo-label .ow { color: var(--muted); font-size: 10px; }
@@ -170,6 +225,9 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
   #transport .segs { grid-column: 2; justify-self: end; }
   #timeline { grid-column: 1 / -1; }
   .tools { grid-column: 1 / -1; justify-content: space-between; }
+  #btn-quality { display: none; }
+  #recpanel { left: 16px; right: 16px; width: auto; bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 196px); }
+  #who-list { display: none; }
 }
 </style>
 </head>
@@ -180,6 +238,7 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
     <div class="kicker"><span id="kicker-title">commit city</span><b id="speed-label"></b></div>
     <div id="clock-date">–</div>
     <div class="clockline"><span id="clock-time">–</span><span class="tz" id="clock-tz"></span><span id="clock-phase"></span></div>
+    <div id="livebadge" class="livebadge" hidden title="New public events on GitHub fly in as they happen (GitHub publishes them about five minutes late)"><i></i><b>live</b><span id="live-n">listening for new pushes</span></div>
     <div class="counters">
       <div class="big"><span id="c-total">0</span><label>commits so far</label></div>
       <div><span id="c-today">0</span><label>today</label></div>
@@ -189,6 +248,7 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
       <div><span id="c-files">0</span><label>files standing</label></div>
       <div><span id="c-lines">0</span><label>lines standing</label></div>
     </div>
+    <div id="whobox" hidden><div class="wh"><span>who wrote it · so far</span><b id="who-pct"></b></div><div class="whosplit" id="who-split"></div><ul id="who-list"></ul></div>
     <div id="contrib-note"></div>
     <div class="ticker-wrap">
       <canvas id="ticker" aria-label="Your commits per hour over the last 48 simulated hours"></canvas>
@@ -210,6 +270,7 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
       <div><span id="f-fp">0</span><label>changes landed</label></div>
     </div>
     <div id="f-last"></div>
+    <div id="f-whobox" hidden><div class="f-sub"><span>who wrote it</span><span id="f-who-n"></span></div><div class="whosplit" id="f-who"></div><div class="f-whol" id="f-who-l"></div></div>
     <div class="f-sub"><span>language mix (lines)</span><span id="f-share"></span></div>
     <div id="f-mix"></div>
     <div class="f-sub"><span>top-level architecture</span><span>files</span></div>
@@ -221,9 +282,11 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
     <div id="board"></div>
   </section>
 
+  <section id="recpanel" class="panel" hidden aria-label="Record a clip"></section>
+  <div id="recbar" class="panel" role="status"><i></i><span id="rec-time">REC 0:00</span><button id="rec-stop">Stop</button></div>
   <div id="toasts" aria-live="polite"></div>
   <div id="legend"><span class="lg-title">building colour = file type · height = lines · platforms = directories</span></div>
-  <div id="help">drag orbit · right-drag pan · scroll zoom · click a repo to inspect<br>space play/pause · ←/→ ±1 day · shift ±1 hour · 1–6 speed · O orbit · L labels · H hide UI</div>
+  <div id="help">drag orbit · right-drag pan · scroll zoom · click a repo to inspect<br>space play/pause · ←/→ ±1 day · shift ±1 hour · 1–6 speed · A agent lens · R record · O orbit · L labels · H hide UI</div>
 
   <section id="transport" class="panel" aria-label="Playback">
     <div class="ctl">
@@ -234,6 +297,8 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
     <div id="speeds" class="segs" role="group" aria-label="Speed"></div>
     <canvas id="timeline" aria-label="Timeline of your daily commits; drag to scrub"></canvas>
     <div class="tools">
+      <button id="btn-lens" class="lens" title="Agent lens: colour commits by human, bot or AI agent (A)">agents</button>
+      <button id="btn-rec" class="rec" title="Record a clip (R)"><i></i>rec</button>
       <button id="btn-orbit" title="Auto-orbit (O)">orbit</button>
       <button id="btn-labels" title="Labels (L)">labels</button>
       <button id="btn-home" title="Back to overview (Esc)">overview</button>
@@ -243,6 +308,7 @@ body.focused #side { top: auto; bottom: 150px; max-height: 26vh; }
   </section>
   <button id="unbare" class="panel" style="position:absolute;padding:8px 12px;border-radius:10px" onclick="document.body.classList.remove('bare')">show UI</button>
 </div>
+<a class="embed-link" id="embed-link" href="/" target="_blank" rel="noopener">commit.city ↗</a>
 <div id="tip" hidden></div>
 <div id="loading">assembling your repos…</div>
 <img id="avatar-src" hidden alt="" src="__AVATAR__">
