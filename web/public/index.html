@@ -44,10 +44,14 @@
 .stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 0.9s; }
 .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; transition: opacity 1.1s; }
 .stage iframe.on { opacity: 1; }
-.stage .shield { position: absolute; inset: 0; z-index: 2; display: grid; place-items: end center; padding-bottom: 18px; cursor: grab; }
-.stage .shield span { padding: 7px 13px; border-radius: 99px; background: rgba(4, 6, 12, 0.72); border: 1px solid var(--line); color: var(--ink-2); font-size: 12.5px;
-  backdrop-filter: blur(8px); opacity: 0; transform: translateY(6px); transition: 0.3s; }
-.stage:hover .shield span { opacity: 1; transform: none; }
+.stage .shield { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; width: 100%; cursor: pointer; }
+.stage .shield span { display: inline-flex; align-items: center; gap: 10px; padding: 7px 16px 7px 7px; border-radius: 99px; background: rgba(4, 6, 12, 0.74);
+  border: 1px solid rgba(95, 211, 243, 0.35); color: var(--ink); font-size: 14px; font-weight: 600; backdrop-filter: blur(8px); transition: 0.2s; }
+.stage .shield i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-style: normal; font-size: 12px; }
+.stage .shield:hover span, .stage .shield:focus-visible span { border-color: var(--accent); transform: scale(1.04); }
+.stage .shield.busy { cursor: progress; place-items: end center; padding-bottom: 18px; }
+.stage .shield.busy span { padding: 7px 13px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); border-color: var(--line); transform: none; }
+.stage .shield.busy i { display: none; }
 .stage .cap { position: absolute; left: 14px; top: 14px; z-index: 3; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 9px; border-radius: 99px;
   background: rgba(4, 6, 12, 0.72); border: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); backdrop-filter: blur(8px); font-family: var(--mono); }
 .stage .cap:hover { color: var(--ink); text-decoration: none; border-color: rgba(95, 211, 243, 0.4); }
@@ -63,24 +67,7 @@
 .tabs button[aria-selected="true"] { color: var(--ink); border-color: rgba(95, 211, 243, 0.5); background: var(--accent-soft); }
 @media (max-width: 980px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); } .hero .lede { max-width: none; } }
 
-/* the URL swap */
-.swapband { padding: 26px 0; border-block: 1px solid var(--line); background: linear-gradient(90deg, transparent, rgba(95, 211, 243, 0.035), transparent); }
-.swapband .wrap { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
-.urlbar { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-1);
-  font: 500 clamp(14px, 1.8vw, 18px) var(--mono); color: var(--ink); min-width: min(440px, 100%); }
-.urlbar svg { width: 14px; height: 14px; fill: var(--muted); flex: none; }
-.urlbar .url { display: inline-flex; align-items: center; white-space: nowrap; }
-.urlbar .dom { position: relative; display: inline-grid; }
-.urlbar .dom span { justify-self: end; }
-.urlbar .dom span { grid-area: 1 / 1; transition: opacity 0.35s, transform 0.35s var(--ease), color 0.35s; }
-.urlbar .dom .a { color: var(--muted); }
-.urlbar .dom .b { color: var(--accent); opacity: 0; transform: translateY(60%); }
-.urlbar.swapped .dom .a { opacity: 0; transform: translateY(-60%); }
-.urlbar.swapped .dom .b { opacity: 1; transform: none; }
-.urlbar .path { color: var(--ink); }
-.urlbar .caret { width: 2px; height: 1.1em; background: var(--accent); animation: blink 1s steps(1) infinite; margin-left: 3px; }
 @keyframes blink { 50% { opacity: 0; } }
-.swapband p { margin: 0; color: var(--muted); font-size: 14px; }
 
 /* read the city */
 .read { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 56px); align-items: center; }
@@ -102,41 +89,44 @@
 .langs i { width: 9px; height: 9px; border-radius: 2px; }
 @media (max-width: 900px) { .read { grid-template-columns: minmax(0, 1fr); } .read > :first-child { position: static; } }
 
-/* agents */
-.agents { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-.agents .card { padding: 28px; display: flex; flex-direction: column; }
-.agents .card .h3 { margin: 14px 0 6px; }
-.livebig { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 22px 0 14px; }
+/* cities dashboard */
+.dash-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 22px; }
+.dash-head > div { max-width: 640px; }
+.dash-head .h2 { margin: 14px 0 10px; }
+.dash-head p { margin: 0; color: var(--ink-2); font-size: 16px; }
+.dash-head .btn.ghost { margin-inline: -12px; }
+.dbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+.dbar .field { flex: 1 1 220px; max-width: 360px; height: 40px; }
+.dbar .field svg { width: 16px; height: 16px; stroke: var(--muted); fill: none; stroke-width: 2; flex: none; }
+.dbar .count { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.more { display: flex; justify-content: center; margin-top: 22px; }
+@media (max-width: 640px) { .dbar .count { display: none; } .dbar .seg { order: 3; } }
+
+/* live */
+.livecard { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: clamp(24px, 4vw, 48px); padding: clamp(22px, 3vw, 34px); }
+.livecard .h2 { margin: 14px 0 12px; }
+.livecard p { margin: 0; color: var(--ink-2); font-size: 15px; }
+.livebig { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 24px 0 14px; }
 .livebig div { display: flex; flex-direction: column; gap: 2px; }
 .livebig b { font-size: clamp(28px, 3.4vw, 40px); font-weight: 760; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .livebig label { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
 .livebig label i { width: 8px; height: 8px; border-radius: 2px; }
-.feed { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-height: 196px; }
+#lv-note { display: block; margin-top: 8px; font-size: 12px; }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 2px; min-height: 456px; }
 .feed li { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 6px 4px; border-radius: 8px; font-size: 13px; color: var(--ink-2); animation: feedin 0.5s var(--ease); }
 .feed li img { width: 24px; height: 24px; border-radius: 50%; background: var(--bg-3); }
 .feed li .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed li .tx b { color: var(--ink); font-weight: 600; }
 .feed li .tg { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
 @keyframes feedin { from { opacity: 0; transform: translateY(-6px); } }
-.agentlist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 22px 0 6px; }
-.agentlist a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; color: var(--ink-2); font-size: 13.5px; }
-.agentlist a:hover { text-decoration: none; color: var(--ink); }
-.agentlist .split { grid-column: 1 / -1; height: 7px; }
-.agentlist .nm { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
-.agentlist .pc { font-variant-numeric: tabular-nums; color: var(--agent); }
-.roster { margin-top: 22px; }
+.livecard .roster { grid-column: 1 / -1; padding-top: 20px; border-top: 1px solid var(--line); }
 .roster small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 10px; }
 .roster div { display: flex; flex-wrap: wrap; gap: 6px; }
 .ag { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 99px; font-size: 12px; color: var(--ink-2);
   border: 1px solid color-mix(in srgb, var(--c) 32%, transparent); background: color-mix(in srgb, var(--c) 7%, transparent); }
 .ag i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
-.agents .foot2 { margin-top: auto; padding-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.beams { display: flex; gap: 16px; margin-top: 18px; }
-.beams div { flex: 1; text-align: center; padding: 14px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-1); }
-.beams svg { width: 100%; height: 54px; }
-.beams b { display: block; font-size: 13px; margin-top: 6px; }
-.beams small { color: var(--muted); font-size: 11.5px; }
-@media (max-width: 900px) { .agents { grid-template-columns: minmax(0, 1fr); } }
+.livecard .foot2 { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 900px) { .livecard { grid-template-columns: minmax(0, 1fr); } .feed { min-height: 0; } }
 
 /* share */
 .share .card { display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
@@ -199,7 +189,7 @@
   <div class="backdrop"></div>
   <div class="wrap">
     <div>
-      <a class="pill rv" href="#agents"><i>new</i>The agent lens: see what AI wrote, commit by commit →</a>
+      <a class="pill rv" href="#live"><i>new</i>The agent lens: see what AI wrote, commit by commit →</a>
       <h1 class="h1 rv d1">Your GitHub,<br>as a <span class="grad">living city</span>.</h1>
       <p class="lede rv d2">Swap <code>github.com</code> for <code>commit.city</code> on any profile, org or repo. A year of git history replays as a 3D city:
         <b>every file a tower, every commit a beam of light</b>, every bot and AI agent accounted for.</p>
@@ -217,22 +207,68 @@
         <img class="poster" id="poster" alt="">
         <a class="cap" id="cap" href="/sindresorhus"><i></i><span id="capt">commit.city/sindresorhus</span></a>
         <div class="open"><a class="btn sm" id="openit" href="/sindresorhus">Open <span class="arrow">→</span></a></div>
-        <div class="shield" id="shield"><span>Drag to orbit · click to explore</span></div>
+        <button class="shield" id="shield" type="button" aria-label="Play this city in 3D"><span><i>▶</i><em id="shieldt" style="font-style:normal">Play in 3D</em></span></button>
       </div>
       <div class="tabs" id="tabs" role="tablist" aria-label="Example cities"></div>
     </div>
   </div>
 </section>
 
-<div class="swapband">
+<section class="section" id="cities" style="padding-top:clamp(24px, 4vw, 48px)">
   <div class="wrap">
-    <div class="urlbar" id="urlbar" aria-label="github.com becomes commit.city">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 7V5a4 4 0 118 0v2h.5A1.5 1.5 0 0114 8.5v5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 13.5v-5A1.5 1.5 0 013.5 7H4zm2 0h4V5a2 2 0 10-4 0v2z"/></svg>
-      <span class="url"><span class="dom"><span class="a">github.com</span><span class="b">commit.city</span></span><span class="path" id="urlpath">/torvalds</span><span class="caret"></span></span>
+    <div class="dash-head rv">
+      <div><span class="kick">Explore</span><h2 class="h2">Every city, so far.</h2>
+        <p>People, orgs and repos that visitors have built. Each one is cached, so it opens instantly.</p></div>
+      <a class="btn ghost" href="/explore">Full page <span class="arrow">→</span></a>
     </div>
-    <p>Same URL, one word different. Works for <b>people</b>, <b>orgs</b> and <b>repos</b>, and <span class="mono">?all=1</span> replays a repo from its first commit.</p>
+    <div class="dbar rv d1">
+      <label class="field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="cf" type="search" placeholder="Filter by name" autocomplete="off" spellcheck="false" aria-label="Filter cities"></label>
+      <div class="seg" role="group" aria-label="Kind" id="kinds">
+        <button aria-pressed="true" data-k="">All</button><button aria-pressed="false" data-k="user">People</button><button aria-pressed="false" data-k="org">Orgs</button><button aria-pressed="false" data-k="repo">Repos</button>
+      </div>
+      <select class="select" id="sort" aria-label="Sort by">
+        <option value="featured">Featured first</option>
+        <option value="recent">Latest built</option>
+        <option value="commits">Most commits</option>
+        <option value="agent">Most agent-written</option>
+        <option value="bot">Most bot-written</option>
+        <option value="lines">Most lines</option>
+        <option value="repos">Most repos</option>
+      </select>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="more" id="morebox" hidden><button class="btn" id="more" type="button"></button></div>
   </div>
-</div>
+</section>
+
+<hr class="rule">
+
+<section class="section" id="live">
+  <div class="wrap">
+    <div class="card livecard rv">
+      <div>
+        <span class="kick" style="color:var(--good)"><i class="live-dot" style="margin-right:2px"></i>GitHub, right now</span>
+        <h2 class="h2">Who's writing the code, live.</h2>
+        <p>The latest public events on all of GitHub, sorted by who sent them. commit.city reads the signatures bots and AI agents leave (bot accounts,
+          agent branches, <span class="mono">Co-authored-by</span> trailers). Press <kbd>A</kbd> in any city for the same split.</p>
+        <div class="livebig">
+          <div><b id="lv-h">–</b><label><i style="background:var(--human)"></i>humans</label></div>
+          <div><b id="lv-b">–</b><label><i style="background:var(--bot)"></i>bots</label></div>
+          <div><b id="lv-a">–</b><label><i style="background:var(--agent)"></i>AI agents</label></div>
+        </div>
+        <div class="split" id="lv-split"><span class="h" style="flex-grow:1"></span><span class="b" style="flex-grow:0"></span><span class="a" style="flex-grow:0"></span></div>
+        <small class="dim" id="lv-note"></small>
+        <div class="foot2"><a class="btn" href="/events"><i class="live-dot"></i>Watch it live in 3D <span class="arrow">→</span></a><a class="btn ghost" href="/about#agents">How detection works <span class="arrow">→</span></a></div>
+      </div>
+      <ul class="feed" id="feed"></ul>
+      <div class="roster"><small>Recognises 17 agents, from rules anyone can read and extend</small><div><span class="ag" style="--c:#d97757"><i></i>Claude</span><span class="ag" style="--c:#a78bfa"><i></i>Copilot</span><span class="ag" style="--c:#e2e8f0"><i></i>Cursor</span><span class="ag" style="--c:#10a37f"><i></i>Codex</span><span class="ag" style="--c:#2dd4bf"><i></i>Devin</span><span class="ag" style="--c:#e879f9"><i></i>Jules</span><span class="ag" style="--c:#4f8ef7"><i></i>Gemini</span><span class="ag" style="--c:#a3e635"><i></i>Aider</span><span class="ag" style="--c:#f43f5e"><i></i>Amp</span><span class="ag" style="--c:#fde047"><i></i>OpenHands</span><span class="ag" style="--c:#f59e0b"><i></i>Replit Agent</span><span class="ag" style="--c:#f472b6"><i></i>Lovable</span><span class="ag" style="--c:#fecdd3"><i></i>v0</span><span class="ag" style="--c:#4ade80"><i></i>Junie</span><span class="ag" style="--c:#7dd3fc"><i></i>Sweep</span><span class="ag" style="--c:#fed7aa"><i></i>Factory</span><span class="ag" style="--c:#ff7a1a"><i></i>CodeRabbit</span></div></div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
 
 <section class="section" id="read">
   <div class="wrap read">
@@ -248,60 +284,6 @@
       <ul class="keys rv d1" id="keys"></ul>
       <div class="langs rv d2" id="langs"></div>
     </div>
-  </div>
-</section>
-
-<hr class="rule">
-
-<section class="section" id="agents">
-  <div class="wrap">
-    <div class="section-head rv">
-      <span class="kick">Humans, bots and agents</span>
-      <h2 class="h2">Who's actually writing the code?</h2>
-      <p>More and more commits come from AI agents and automation. commit.city reads the signatures they leave (bot accounts, agent branches,
-        <span class="mono">Co-authored-by</span> trailers) and colours every beam by who sent it.</p>
-    </div>
-    <div class="agents">
-      <div class="card rv">
-        <span class="kick" style="color:var(--good)"><i class="live-dot" style="margin-right:2px"></i>GitHub, right now</span>
-        <h3 class="h3">The public timeline, live.</h3>
-        <p>The latest public events on all of GitHub, sorted by who sent them.</p>
-        <div class="livebig">
-          <div><b id="lv-h">–</b><label><i style="background:var(--human)"></i>humans</label></div>
-          <div><b id="lv-b">–</b><label><i style="background:var(--bot)"></i>bots</label></div>
-          <div><b id="lv-a">–</b><label><i style="background:var(--agent)"></i>AI agents</label></div>
-        </div>
-        <div class="split" id="lv-split"><span class="h" style="flex-grow:1"></span><span class="b" style="flex-grow:0"></span><span class="a" style="flex-grow:0"></span></div>
-        <ul class="feed" id="feed"></ul>
-        <div class="foot2"><a class="btn" href="/events"><i class="live-dot"></i>Watch it live <span class="arrow">→</span></a><small class="dim" id="lv-note"></small></div>
-      </div>
-      <div class="card rv d1">
-        <span class="kick" style="color:var(--agent)">The agent lens</span>
-        <h3 class="h3">Every city, split by author.</h3>
-        <p>Press <kbd>A</kbd> in any city and its beams recolour: people, automation and AI. The panel breaks it down by agent and by repo, at every moment of the year.</p>
-        <div class="beams" aria-hidden="true">
-          <div><svg viewBox="0 0 100 54"><path d="M10 48 Q50 -6 90 30" fill="none" stroke="var(--human)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 7"><animate attributeName="stroke-dashoffset" from="22" to="0" dur="0.9s" repeatCount="indefinite"/></path></svg><b>Human</b><small>your commits</small></div>
-          <div><svg viewBox="0 0 100 54"><path d="M10 48 Q50 -6 90 30" fill="none" stroke="var(--bot)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 7"><animate attributeName="stroke-dashoffset" from="22" to="0" dur="1.3s" repeatCount="indefinite"/></path></svg><b>Bot</b><small>dependabot, actions</small></div>
-          <div><svg viewBox="0 0 100 54"><path d="M10 48 Q50 -6 90 30" fill="none" stroke="var(--agent)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 7"><animate attributeName="stroke-dashoffset" from="22" to="0" dur="0.7s" repeatCount="indefinite"/></path></svg><b>Agent</b><small>Claude, Copilot, Codex…</small></div>
-        </div>
-        <div class="agentlist" id="agentlist" hidden></div>
-        <div class="roster"><small>Recognises 17 agents today, from rules anyone can read and extend</small><div><span class="ag" style="--c:#d97757"><i></i>Claude</span><span class="ag" style="--c:#a78bfa"><i></i>Copilot</span><span class="ag" style="--c:#e2e8f0"><i></i>Cursor</span><span class="ag" style="--c:#10a37f"><i></i>Codex</span><span class="ag" style="--c:#2dd4bf"><i></i>Devin</span><span class="ag" style="--c:#e879f9"><i></i>Jules</span><span class="ag" style="--c:#4f8ef7"><i></i>Gemini</span><span class="ag" style="--c:#a3e635"><i></i>Aider</span><span class="ag" style="--c:#f43f5e"><i></i>Amp</span><span class="ag" style="--c:#fde047"><i></i>OpenHands</span><span class="ag" style="--c:#f59e0b"><i></i>Replit Agent</span><span class="ag" style="--c:#f472b6"><i></i>Lovable</span><span class="ag" style="--c:#fecdd3"><i></i>v0</span><span class="ag" style="--c:#4ade80"><i></i>Junie</span><span class="ag" style="--c:#7dd3fc"><i></i>Sweep</span><span class="ag" style="--c:#fed7aa"><i></i>Factory</span><span class="ag" style="--c:#ff7a1a"><i></i>CodeRabbit</span></div></div>
-        <div class="foot2"><a class="btn" href="/about#agents">How detection works <span class="arrow">→</span></a></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<hr class="rule">
-
-<section class="section" id="explore">
-  <div class="wrap">
-    <div class="section-head rv" style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;max-width:none;flex-wrap:wrap">
-      <div style="max-width:640px"><span class="kick">Explore</span><h2 class="h2">Cities people have built.</h2>
-        <p>Every city is public data, cached once built, so opening one someone else made is instant.</p></div>
-      <a class="btn" href="/explore">Browse all cities <span class="arrow">→</span></a>
-    </div>
-    <div class="tiles" id="tiles"></div>
   </div>
 </section>
 
@@ -412,7 +394,7 @@ commit-city build --login <span class="v">you</span> --include-private
 </main>
 
 <script type="module">
-const { $, esc, compact, avatarOf, gallery, tile, skeleton } = window.CCSite;
+const { $, esc, avatarOf, gallery, tile, skeleton } = window.CCSite;
 
 // ── try chips + hero stage tabs
 const TRY = [['sindresorhus', 'person'], ['torvalds', 'person'], ['vercel', 'org'], ['facebook/react', 'repo']];
@@ -422,7 +404,7 @@ const STAGE = [
   { t: 'vercel', label: 'vercel', kind: 'org' },
   { t: 'facebook/react', label: 'facebook/react', kind: 'repo' },
 ];
-const stage = $('#stage'), poster = $('#poster');
+const stage = $('#stage'), poster = $('#poster'), shield = $('#shield');
 let cur = -1, live = false;
 const since = new Date(Date.now() - 150 * 86400e3).toISOString().slice(0, 10);   // most of the city already standing
 function show(i) {
@@ -443,7 +425,7 @@ function mount(s) {
   f.src = `/${s.t}#embed=1&hud=0&speed=1d&t=${since}`;
   f.addEventListener('load', () => setTimeout(() => {
     if (STAGE[cur].t !== s.t) return f.remove();
-    f.classList.add('on'); poster.style.opacity = 0;
+    f.classList.add('on'); poster.style.opacity = 0; shield.hidden = true;
     setTimeout(() => old.forEach(o => o.remove()), 1200);
   }, 1500));
   stage.insertBefore(f, $('#cap'));
@@ -451,24 +433,10 @@ function mount(s) {
 $('#tabs').innerHTML = STAGE.map((s, i) => `<button role="tab" data-i="${i}"><img src="${avatarOf(s.t.split('/')[0], 52)}" alt="">${esc(s.label)} <small>${s.kind}</small></button>`).join('');
 $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(+b.dataset.i); });
 show(0);
-// the live city loads once the page is idle, on screens big enough and for people who don't mind motion
-const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const goLive = () => { if (live) return; live = true; mount(STAGE[cur]); };
-if (!calm && matchMedia('(min-width: 700px)').matches) addEventListener('load', () => (window.requestIdleCallback || setTimeout)(goLive, { timeout: 1800 }));
-$('#shield').addEventListener('pointerdown', () => { goLive(); $('#shield').remove(); });
-addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.cc === 'missing') { stage.querySelectorAll('iframe').forEach(f => f.remove()); poster.style.opacity = 1; } });
-
-// ── the URL swap demo
-const PATHS = ['/torvalds', '/vercel', '/facebook/react', '/sindresorhus', '/denoland/deno?all=1', '/you'];
-let pi = 0;
-const bar = $('#urlbar');
-setInterval(() => {
-  if (document.hidden) return;
-  if (!bar.classList.contains('swapped')) { bar.classList.add('swapped'); return; }
-  bar.classList.remove('swapped');
-  pi = (pi + 1) % PATHS.length;
-  setTimeout(() => ($('#urlpath').textContent = PATHS[pi]), 200);
-}, 1700);
+// the 3D city is the heaviest thing on the page (the viewer, a city's data, WebGL), so it loads only when asked for
+const setShield = busy => { live = busy; shield.hidden = false; shield.classList.toggle('busy', busy); $('#shieldt').textContent = busy ? 'Loading the city…' : 'Play in 3D'; };
+shield.addEventListener('click', () => { if (live) return; setShield(true); mount(STAGE[cur]); });
+addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.cc === 'missing') { stage.querySelectorAll('iframe').forEach(f => f.remove()); poster.style.opacity = 1; setShield(false); } });
 
 // ── the annotated miniature city
 const LANG = [['TS / JS', '#3987e5'], ['Python', '#d95926'], ['Docs', '#199e70'], ['SQL / data', '#c98500'], ['Markup / styles', '#d55181'], ['Config', '#008300'], ['Shell / infra', '#9085e9'], ['Other code', '#e66767'], ['Other files', '#7d7b75']];
@@ -580,6 +548,7 @@ function iso() {
 const pct = x => `${Math.round(x * 100)}%`;
 const KIND = { bot: ['bot', 'var(--bot)'], agent: ['agent', 'var(--agent)'] };
 let queue = [], shown = [], AG = {};
+const FEED_ROWS = matchMedia('(max-width: 640px)').matches ? 8 : 12;
 async function pullLive() {
   try {
     const r = await fetch('/api/live');
@@ -611,30 +580,55 @@ function drip() {
     : e.type === 'issue' ? (e.act === 'opened' ? 'opened an issue in' : e.act === 'closed' ? 'closed an issue in' : 'updated an issue in') : VERB[e.type] || 'touched';
   li.innerHTML = `<img src="https://avatars.githubusercontent.com/u/${e.aid}?s=48" alt="" loading="lazy"><span class="tx"><b>${esc(e.actor)}</b> ${verb} <b>${esc(e.repo)}</b></span>${tag}`;
   feed.prepend(li);
-  while (feed.children.length > 6) feed.lastElementChild.remove();
+  while (feed.children.length > FEED_ROWS) feed.lastElementChild.remove();
 }
-const agentsCard = $('#feed');
 new IntersectionObserver((es, io) => {
   if (!es[0].isIntersecting) return;
   io.disconnect();
-  pullLive().then(() => { for (let i = 0; i < 4; i++) drip(); });
+  pullLive().then(() => { for (let i = 0; i < 6; i++) drip(); });
   setInterval(() => { if (!document.hidden) drip(); }, 1900);
   setInterval(() => { if (!document.hidden) pullLive(); }, 30000);
-}, { rootMargin: '200px' }).observe(agentsCard);
+}, { rootMargin: '200px' }).observe($('#feed'));
 
-// ── gallery tiles + the agent lens examples
-$('#tiles').innerHTML = skeleton(6);
-gallery().then(g => {
-  const list = (g.featured.length ? g.featured : g.all).slice(0, 6);
-  $('#tiles').innerHTML = list.length ? list.map(e => tile(e)).join('') : '<div class="empty">Featured cities appear here once they are built. Build the first one above.</div>';
-  const withWho = g.all.filter(e => typeof e.agent === 'number' && (e.agent > 0 || e.bot > 0)).sort((a, b) => b.agent - a.agent).slice(0, 4);
-  $('#agentlist').hidden = !withWho.length;
-  $('#agentlist').innerHTML = withWho.map(e => {
-    const h = Math.max(0, 1 - e.agent - e.bot);
-    return `<a href="/${esc(e.target)}#lens=agents"><span class="nm">${esc(e.target)}</span><span class="pc">${pct(e.agent)} agent · <span style="color:var(--bot)">${pct(e.bot)} bot</span></span>
-      <div class="split"><span class="h" style="flex-grow:${h}"></span><span class="b" style="flex-grow:${e.bot}"></span><span class="a" style="flex-grow:${e.agent}"></span></div></a>`;
-  }).join('');
+// ── the cities dashboard: every city built so far, filtered and sorted in place; two rows until asked for more
+const D = { q: '', kind: '', sort: 'featured', all: false };
+const cols = () => getComputedStyle($('#tiles')).gridTemplateColumns.split(' ').length;
+const twoRows = () => Math.max(4, 2 * cols());
+const SORTS = {
+  featured: () => 0,                                    // the gallery's own order: featured, then latest built
+  recent: (a, b) => (b.v || 0) - (a.v || 0),
+  commits: (a, b) => b.commits - a.commits,
+  agent: (a, b) => (b.agent || 0) - (a.agent || 0) || b.commits - a.commits,
+  bot: (a, b) => (b.bot || 0) - (a.bot || 0) || b.commits - a.commits,
+  lines: (a, b) => b.lines - a.lines,
+  repos: (a, b) => b.repos - a.repos,
+};
+let G = null, lastCols = 0;
+function cities() {
+  if (!G) return;
+  lastCols = cols();
+  const q = D.q.trim().toLowerCase();
+  const list = G.all.filter(e => (!D.kind || e.kind === D.kind) && (!q || e.target.toLowerCase().includes(q))).sort(SORTS[D.sort] || SORTS.featured);
+  const shown = D.all ? list : list.slice(0, twoRows());
+  $('#tiles').innerHTML = shown.length ? shown.map(e => tile(e)).join('')
+    : `<div class="empty" style="grid-column:1/-1">${q ? `Nothing built matches <b>${esc(q)}</b> yet. <a href="/${esc(window.CCSite.parse(q) || '')}">Build it →</a>` : 'No cities here yet. Build the first one above.'}</div>`;
+  $('#count').textContent = `${list.length} ${list.length === 1 ? 'city' : 'cities'}`;
+  $('#more').textContent = `Show all ${list.length} cities`;
+  $('#morebox').hidden = shown.length >= list.length;
+}
+$('#tiles').innerHTML = skeleton(twoRows());
+addEventListener('resize', () => { if (!D.all && cols() !== lastCols) cities(); });
+gallery().then(g => { G = g; cities(); });
+$('#cf').addEventListener('input', e => { D.q = e.target.value; cities(); });
+$('#sort').addEventListener('change', e => { D.sort = e.target.value; cities(); });
+$('#kinds').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  D.kind = b.dataset.k;
+  $('#kinds').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  cities();
 });
+$('#more').addEventListener('click', () => { D.all = true; cities(); });
 
 // ── the card snippet uses this site's origin (previews and forks work too)
 const me = window.CCSite.me;
