@@ -925,20 +925,39 @@ const el = {
   ticker: $('ticker'), tl: $('timeline'), board: $('board'), focus: $('focus'), tip: $('tip'), toasts: $('toasts'),
   play: $('btn-play'), orbit: $('btn-orbit'), labels: $('btn-labels'), loading: $('loading'),
 };
-// identity + the commits-vs-contributions note (GitHub's calendar counts PRs, issues, reviews and private activity too)
+// identity + the note that reconciles GitHub's contribution count with the buildings, in numbers
 {
   document.title = DATA.title || `${LOGIN} · commit city`;
   $('kicker-title').textContent = `${LOGIN} · commit city`;
   $('clock-tz').textContent = TZ.label;
   const tot = DATA.totals || {};
   const bits = [];
-  if (tot.contributions != null) bits.push(`GitHub shows ${fmtInt(tot.contributions)} contributions since ${tot.window_start}; it also counts PRs, issues, reviews and private activity. Buildings show default-branch commits.`);
+  const list = xs => (xs.length < 3 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')}, and ${xs[xs.length - 1]}`);
   // the repos too big to replay are named, because one of them can be most of a person's year (torvalds/linux)
   const big = Array.isArray(tot.too_big) ? tot.too_big : [];
+  const bigCommits = big.reduce((a, b) => a + b.commits, 0);
   const skip = big.length ? `Not drawn, too big for the hosted builder: ${big.map(b => `${b.repo} (${fmtInt(b.commits)} commits)`).join(', ')}.` : '';
   // the rest = repos past the busiest-N cap *and* any further too-big ones, so no "smaller"
-  const rest = (tot.omitted_repos || 0) - big.length, restCommits = (tot.omitted_commits || 0) - big.reduce((a, b) => a + b.commits, 0);
+  const rest = (tot.omitted_repos || 0) - big.length, restCommits = Math.max(0, (tot.omitted_commits || 0) - bigCommits);
+  const gh = tot.contributions != null && tot.github ? tot.github : null;
+  if (gh) {
+    // the calendar = public commits + private contributions + issues, PRs, reviews and the like
+    const priv = tot.restricted || 0, other = Math.max(0, tot.contributions - priv - gh.commits);
+    const parts = [`${fmtInt(gh.commits)} public commits`, ...(priv ? [`${fmtInt(priv)} private`] : []), ...(other ? [`${fmtInt(other)} issues, PRs, reviews and other activity`] : [])];
+    bits.push(`GitHub shows ${fmtInt(tot.contributions)} contributions since ${tot.window_start}: ${list(parts)}. Buildings show ${fmtInt(tot.commits)} commits, all on default branches as they stand today.`);
+  } else if (tot.contributions != null) {
+    bits.push(`GitHub shows ${fmtInt(tot.contributions)} contributions since ${tot.window_start}; it also counts PRs, issues, reviews and private activity. Buildings show default-branch commits.`);
+  } else if (!PERSONAL) {
+    bits.push(`Buildings show every non-merge commit on ${DATA.kind === 'org' ? "each repo's" : 'the'} default branch since ${tot.window_start}.`);
+  }
   if (rest > 0) bits.push(`${rest} ${big.length ? 'more ' : ''}${rest === 1 ? 'repo' : 'repos'} (${fmtInt(restCommits)} commits) not drawn: the very largest are skipped, and only the busiest are shown.`);
+  // what is left of GitHub's count: commits it credits to co-authors, commits once pushed to a default branch and
+  // rewritten since (it keeps counting those), one commit in several repos (drawn once), repos it never listed
+  const more = gh ? gh.commits - (tot.commits || 0) - bigCommits - restCommits : 0;
+  if (more > 0) {
+    const why = [...(gh.capped ? ['commits in repos past the 100 it lists'] : []), 'co-authored commits', 'commits later rewritten off a default branch', 'the same commit in several repos'];
+    bits.push(`GitHub also counts ${fmtInt(more)} more, such as ${list(why)}.`);
+  }
   if (!PERSONAL) {
     for (const [sel, text] of [['#f-commits + label', 'commits'], ['.side-head span', 'repos · commits so far'], ['.tick-labels span:nth-child(2)', 'commits per hour']]) {
       const n = document.querySelector(sel); if (n) n.textContent = text;

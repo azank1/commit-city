@@ -68,6 +68,7 @@ test('bundle matches python (aggregation, budgets, epoch, timezone)', async () =
   const cfg = { max_files_per_repo: 9, max_files_total: 22, max_repos: 2 };
   const py = pythonBundle(
     { profile: { login: 'ann', name: 'Ann', avatar_url: 'https://x/a.png' }, start, now, contributions: 77, restricted: 5,
+      github: { commits: 70, capped: true },
       repos: Object.fromEntries(Object.entries(shas).map(([n, s]) => [n, { shas: s }])) },
     records.map(r => ({ v: r.v, repo: r.repo, head: r.head, fp_commits: r.fp_commits, base_t: r.base_t, files: r.files, private: false, fork: false,
       mine: mineOf(r, { shas: new Set(shas[r.repo]) }) })),
@@ -75,11 +76,13 @@ test('bundle matches python (aggregation, budgets, epoch, timezone)', async () =
   );
   const ts = bundle({
     login: 'ann', name: 'Ann', avatar: 'https://x/a.png', url: 'https://github.com/ann', now, start, contributions: 77, restricted: 5,
+    github: { commits: 70, capped: true },
     repos: records.map(r => ({ name: r.repo, fork: false, record: r, mine: mineOf(r, { shas: new Set(shas[r.repo]) }) })),
     maxFilesPerRepo: 9, maxFilesTotal: 22, maxRepos: 2,
   });
   for (const k of ['generator', 'generated'] as const) { delete (py as Record<string, unknown>)[k]; delete (ts as Partial<typeof ts>)[k]; }
   assert.deepEqual(ts, py);
+  assert.deepEqual(ts.totals.github, { commits: 70, capped: true });
   assert.ok(ts.repos.some(r => r.agg > 0), 'aggregation exercised');
   assert.deepEqual(ts.who, ['human', 'bot', 'claude', 'copilot', 'cursor']);     // claude and copilot tie: by id
   const w = ts.repos[0].m.map(m => ts.who[m[3] ?? 0]);
@@ -125,7 +128,7 @@ test('finish step: records of another version are never drawn; meta and gallery 
   const ticket = sign({ k: 'me', t: 'me', s: start, w: false, r: [['me/alpha', r.head(), 0], ['me/beta', 'b'.repeat(40), 0]] }, 600);
   const plan = sign({
     k: 'me', kind: 'org', mode: 'all', s: start, n: T0 + 30 * DAY, p: { login: 'me', name: 'Me', avatar: '', url: '', createdAt: '' },
-    c: null, x: 0, o: [1, 900], b: [['me/huge', 900]],
+    c: null, x: 0, o: [1, 900], b: [['me/huge', 900]], g: { commits: 950, capped: false },
     r: [{ n: 'me/alpha', f: false, c: 7, h: r.head() }, { n: 'me/beta', f: false, c: 5, h: 'b'.repeat(40) }],
   }, 600);
   const meta = await finishBuild(ticket, plan);
@@ -139,4 +142,5 @@ test('finish step: records of another version are never drawn; meta and gallery 
   // me/beta's record is unusable, so it joins the too-big repo discovery skipped; only the latter is named
   assert.deepEqual([payload.totals.omitted_repos, payload.totals.omitted_commits], [2, 905]);
   assert.deepEqual(payload.totals.too_big, [{ repo: 'me/huge', commits: 900 }]);
+  assert.deepEqual(payload.totals.github, { commits: 950 });            // GitHub's count rides along; capped only when true
 });

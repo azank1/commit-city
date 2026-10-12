@@ -210,6 +210,8 @@ def build(found, cfg, cache, log):
             'window_start': datetime.fromtimestamp(found['start'], timezone.utc).strftime('%Y-%m-%d'),
             'omitted_repos': len(omitted),
             'omitted_commits': sum(len(r['mine']) for r in omitted),
+            **({'github': {'commits': found['github']['commits'], **({'capped': True} if found['github']['capped'] else {})}}
+               if found.get('github') else {}),
         },
         'repos': repos,
     }

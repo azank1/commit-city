@@ -60,6 +60,12 @@
             "required": ["repo", "commits"],
             "properties": { "repo": { "type": "string" }, "commits": { "type": "integer" } }
           }
+        },
+        "github": {
+          "type": "object",
+          "description": "A person's public commits as GitHub's contribution calendar counts them, for reconciling the calendar with the city; capped: GitHub's list of their repos stopped at 100. Absent for orgs and repos",
+          "required": ["commits"],
+          "properties": { "commits": { "type": "integer" }, "capped": { "const": true } }
         }
       }
     },

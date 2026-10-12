@@ -5,7 +5,7 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 
 CONTRIB_Q = '''query($login:String!,$from:DateTime!,$to:DateTime!){user(login:$login){contributionsCollection(from:$from,to:$to){
-  restrictedContributionsCount
+  restrictedContributionsCount totalCommitContributions
   contributionCalendar{totalContributions}
   commitContributionsByRepository(maxRepositories:100){repository{nameWithOwner isPrivate isFork}}}}}'''
 
@@ -33,8 +33,9 @@ def window_start(cfg, prof, now):
 
 
 def contributions(gh, login, start, end, log):
-    """Calendar total + repos with commit contributions, in <=1-year GraphQL windows."""
-    total, restricted, repos, ok = 0, 0, {}, True
+    """Calendar total + repos with commit contributions, in <=1-year GraphQL windows. Also the public commits
+    the calendar counts, and whether any window's repo list hit GitHub's cap of 100 (for the city's note)."""
+    total, restricted, commits, capped, repos, ok = 0, 0, 0, False, {}, True
     a = start
     while a < end:
         b = min(end, a + 365 * 86400 - 1)
@@ -46,11 +47,14 @@ def contributions(gh, login, start, end, log):
             break
         total += cc['contributionCalendar']['totalContributions']
         restricted += cc['restrictedContributionsCount']
+        commits += cc['totalCommitContributions']
+        capped = capped or len(cc['commitContributionsByRepository']) >= 100
         for row in cc['commitContributionsByRepository']:
             r = row['repository']
             repos[r['nameWithOwner']] = {'private': r['isPrivate'], 'fork': r['isFork']}
         a = b + 1
-    return (total if ok else None), restricted, repos, ok
+    github = {'commits': commits, 'capped': capped} if ok else None
+    return (total if ok else None), restricted, github, repos, ok
 
 
 def search_repos(gh, login, start):
@@ -100,7 +104,7 @@ def discover(gh, cfg, now, log):
     prof = profile(gh, cfg.login)
     start = window_start(cfg, prof, now)
     log(f'{prof["login"]}: window from {iso(start)[:10]}')
-    total, restricted, cands, ok = contributions(gh, cfg.login, start, int(now), log)
+    total, restricted, github, cands, ok = contributions(gh, cfg.login, start, int(now), log)
     if not ok:
         cands = search_repos(gh, cfg.login, start)
     viewer = None
@@ -119,12 +123,15 @@ def discover(gh, cfg, now, log):
     log(f'{len(names)} candidate repos; listing your commits in each')
     with cf.ThreadPoolExecutor(6) as ex:
         shas = dict(zip(names, ex.map(lambda n: my_commits(gh, n, cfg.login, start), names)))
+    # a commit that also lives in a fork counts once: in the source repo when it is there (GitHub counts it
+    # there, and never in a fork), otherwise in the repo where most of yours are
     seen, repos = set(), {}
-    for n in sorted(names, key=lambda n: -len(shas[n])):        # a commit shared by a fork counts once
+    for n in sorted(names, key=lambda n: (cands[n]['fork'] is True, -len(shas[n]))):
         mine = [s for s in shas[n] if s not in seen]
         seen.update(mine)
         if mine:
             repos[n] = {'shas': mine}
+    repos = dict(sorted(repos.items(), key=lambda kv: -len(kv[1]['shas'])))
     with cf.ThreadPoolExecutor(6) as ex:
         for n, meta in zip(repos, ex.map(lambda n: repo_meta(gh, n), list(repos))):
             repos[n].update(meta)
@@ -132,4 +139,4 @@ def discover(gh, cfg, now, log):
              if (cfg.include_private or not r['private']) and (cfg.include_forks or not r['fork'])}
     log(f'{len(repos)} repos with your commits ({len(seen)} commits)')
     return {'profile': prof, 'start': start, 'now': int(now), 'contributions': total,
-            'restricted': restricted, 'repos': repos}
+            'restricted': restricted, 'github': github, 'repos': repos}
