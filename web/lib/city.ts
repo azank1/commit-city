@@ -10,9 +10,16 @@ import { type Sky, skyline } from './skyline.js';
 import { getJSON, getStore, putJSON } from './store.js';
 import { cityKey } from './target.js';
 
-// the record version is part of the key, so records of an older shape are cache misses and get replayed again
-export const repoPath = (name: string, head: string, whole: boolean) =>
-  `repos/${name.toLowerCase()}/${head}${whole ? '.all' : ''}.v${RECORD_VERSION}.json.gz`;
+// the record version is part of the key, so records of an older shape are cache misses and get replayed again.
+// So is the replay generation: bump REPLAY_GEN when the hosted replay is fixed to fetch commits it used to miss.
+// Generation 2 fetches branches merged into a main that was quiet before the window; that only ever adds commits
+// behind a merge commit, so a generation-1 record without merge commits (or of the whole history, which was never
+// cut) is still exact and stays in use, and one with merges is replayed again. See usableGen().
+export const REPLAY_GEN = 2;
+export const repoPath = (name: string, head: string, whole: boolean, gen = REPLAY_GEN) =>
+  `repos/${name.toLowerCase()}/${head}${whole ? '.all' : ''}.v${RECORD_VERSION}${gen > 1 ? `.g${gen}` : ''}.json.gz`;
+// heads committed after this have no generation-1 record worth looking for (at worst such a repo replays again)
+const GEN2_SINCE = Date.parse('2026-10-13T12:00:00Z') / 1000;
 export const metaPath = (key: string) => `meta/${key}.json`;
 export const cityPath = (key: string, v: number) => `cities/${key}/${v}.json.gz`;
 export const settingsPath = (login: string) => `settings/${login.toLowerCase()}.json`;
@@ -58,7 +65,7 @@ interface Plan {
   p: Discovery['profile']; c: number | null; x: number; o: [number, number];
   b?: [string, number][];       // the biggest repos skipped as too big to replay (counted in o), named on the city page
   g?: Discovery['github'];      // a person's public commits as GitHub counts them, for the city's reconciliation note
-  r: { n: string; f: boolean; c: number; h: string; sh?: string[] }[];
+  r: { n: string; f: boolean; c: number; h: string; sh?: string[]; gen?: number }[];   // gen: an older record still in use
 }
 
 const TTL = 3600;
@@ -97,6 +104,15 @@ export async function readMeta(key: string, fresh = false): Promise<CityMeta | n
 
 const exists = (path: string) => getStore().exists(path);
 
+/** Which cached record of repo@head a build can use: REPLAY_GEN's, a generation-1 record the fix since cannot
+ *  change (no merge commits, or the whole history), or none (0: replay it). */
+export async function usableGen(name: string, head: string, headTime: number, whole: boolean): Promise<number> {
+  if (await exists(repoPath(name, head, whole))) return REPLAY_GEN;
+  if (headTime > GEN2_SINCE) return 0;
+  const old = await getJSON<RepoRecord>(repoPath(name, head, whole, 1)).catch(() => null);
+  return old?.v === RECORD_VERSION && (whole || !old.commits.some(c => c[3] === 1)) ? 1 : 0;
+}
+
 export async function startBuild(target: Target, token: string, opts: { whole?: boolean } = {}) {
   const whole = !!opts.whole && target.kind === 'repo';
   const key = cityKey(target, whole);
@@ -120,18 +136,19 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
     throw new HttpError(422, `${big[0].name} is too big for the hosted builder`, { status: 'too_big', skipped: big.slice(0, 5) });
   }
   const named = big.filter(s => !excluded.has(s.name.toLowerCase())).sort((a, b) => b.commits - a.commits).slice(0, 3);
-  const cached = await Promise.all(repos.map(r => exists(repoPath(r.name, r.head, whole))));
+  const gens = await Promise.all(repos.map(r => usableGen(r.name, r.head, r.headTime, whole)));
   const ticket: Ticket = { k: key, t: d.target, s: whole ? 0 : Math.min(d.start, replayStart(d.now)), w: whole, r: repos.map(r => [r.name, r.head, r.headTime]) };
   const plan: Plan = {
     k: key, kind: d.kind, mode: d.mode, s: d.start, n: d.now, p: d.profile, c: d.contributions, x: d.restricted,
     o: [d.omittedRepos, d.omittedCommits], ...(named.length ? { b: named.map(s => [s.name, s.commits] as [string, number]) } : {}),
     ...(d.github ? { g: d.github } : {}),
-    r: repos.map(r => ({ n: r.name, f: r.fork, c: r.commits, h: r.head, ...(r.shas ? { sh: r.shas } : {}) })),
+    r: repos.map((r, i) => ({ n: r.name, f: r.fork, c: r.commits, h: r.head, ...(r.shas ? { sh: r.shas } : {}),
+      ...(gens[i] && gens[i] !== REPLAY_GEN ? { gen: gens[i] } : {}) })),
   };
   return {
     key, target: d.target, kind: d.kind, profile: d.profile, start: d.start, cost: d.cost,
     ticket: sign(ticket, TTL), plan: sign(plan, TTL),
-    repos: repos.map((r, i) => ({ name: r.name, commits: r.commits, mb: Math.round(r.diskKB / 1024), cached: cached[i] })),
+    repos: repos.map((r, i) => ({ name: r.name, commits: r.commits, mb: Math.round(r.diskKB / 1024), cached: gens[i] > 0 })),
     skipped: d.skipped,
   };
 }
@@ -164,7 +181,7 @@ export async function buildRepo(ticketToken: string, name: string) {
 export async function finishBuild(ticketToken: string, planToken: string): Promise<CityMeta> {
   const t = verify<Ticket>(ticketToken), p = verify<Plan>(planToken);
   if (!t || !p || t.k !== p.k) throw new HttpError(401, 'build ticket expired; reload the page');
-  const records = await Promise.all(p.r.map(r => getJSON<RepoRecord>(repoPath(r.n, r.h, t.w))
+  const records = await Promise.all(p.r.map(r => getJSON<RepoRecord>(repoPath(r.n, r.h, t.w, r.gen))
     .then(rec => (rec?.v === RECORD_VERSION ? rec : null), () => null)));     // another record shape counts as missing
   const repos = p.r.map((r, i) => ({ r, rec: records[i] })).filter(x => x.rec).map(({ r, rec }) => ({
     name: r.n, fork: r.f, record: rec!,
