@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { finishBuild, GALLERY, type GalleryEntry, repoPath } from '../lib/city';
+import { finishBuild, GALLERY, type GalleryEntry, REPLAY_GEN, repoPath, usableGen } from '../lib/city';
 import { aggregate, budgetCaps, bundle, mergeEvents, mineOf, type Payload } from '../lib/engine/bundle';
 import { replayRepo } from '../lib/engine/repo';
 import type { RepoRecord } from '../lib/engine/replay';
@@ -124,7 +124,7 @@ test('finish step: records of another version are never drawn; meta and gallery 
   const old = { ...record, repo: 'me/beta', v: 1, commits: record.commits.map(c => c.slice(0, 6)) };
   await putJSON(repoPath('me/beta', 'b'.repeat(40), false), old);
   await putJSON(`repos/me/beta/${'b'.repeat(40)}.json.gz`, old);
-  assert.ok(repoPath('me/beta', 'b'.repeat(40), false).endsWith('.v2.json.gz'), 'the key carries the record version');
+  assert.ok(repoPath('me/beta', 'b'.repeat(40), false).endsWith('.v2.g2.json.gz'), 'the key carries the record version and replay generation');
   const ticket = sign({ k: 'me', t: 'me', s: start, w: false, r: [['me/alpha', r.head(), 0], ['me/beta', 'b'.repeat(40), 0]] }, 600);
   const plan = sign({
     k: 'me', kind: 'org', mode: 'all', s: start, n: T0 + 30 * DAY, p: { login: 'me', name: 'Me', avatar: '', url: '', createdAt: '' },
@@ -143,4 +143,32 @@ test('finish step: records of another version are never drawn; meta and gallery 
   assert.deepEqual([payload.totals.omitted_repos, payload.totals.omitted_commits], [2, 905]);
   assert.deepEqual(payload.totals.too_big, [{ repo: 'me/huge', commits: 900 }]);
   assert.deepEqual(payload.totals.github, { commits: 950 });            // GitHub's count rides along; capped only when true
+});
+
+test('a generation-1 record stays in use only where the merged-branch fix cannot change it', async () => {
+  setStore(new MemStore());
+  const r = makeRepo(path.join(tmpdir(), 'gen'), 1);
+  const start = T0 + 2 * DAY;
+  const { record } = await replayRepo({ repo: 'me/alpha', head: r.head(), start, transport: localTransport(r.bare()) });
+  assert.ok(record.commits.every(c => c[3] === 0), 'a linear history: no merge commits');
+  const before = T0 + 10 * DAY, after = 1_800_000_000;           // heads committed before and after generation 2
+  const m = 'm'.repeat(40);
+  const merged = { ...record, commits: record.commits.map((c, i) => (i === 0 ? [c[0], c[1], c[2], 1, c[4], c[5], c[6]] : c)) };
+  await putJSON(repoPath('me/alpha', r.head(), false, 1), record);
+  await putJSON(repoPath('me/merged', m, false, 1), merged);
+  await putJSON(repoPath('me/merged', m, true, 1), merged);
+  assert.equal(await usableGen('me/alpha', r.head(), before, false), 1);     // no merges: nothing the fix adds, reused
+  assert.equal(await usableGen('me/merged', m, before, false), 0);           // a merge: the fix may add commits, replay
+  assert.equal(await usableGen('me/merged', m, before, true), 1);            // the whole history was never cut
+  assert.equal(await usableGen('me/alpha', r.head(), after, false), 0);      // too new to have one: not looked up
+  await putJSON(repoPath('me/merged', m, false), merged);
+  assert.equal(await usableGen('me/merged', m, before, false), REPLAY_GEN);
+  // finish reads the record from the generation the plan names
+  const ticket = sign({ k: 'me', t: 'me', s: start, w: false, r: [['me/alpha', r.head(), before]] }, 600);
+  const plan = sign({
+    k: 'me', kind: 'org', mode: 'all', s: start, n: T0 + 30 * DAY, p: { login: 'me', name: 'Me', avatar: '', url: '', createdAt: '' },
+    c: null, x: 0, o: [0, 0], r: [{ n: 'me/alpha', f: false, c: 7, h: r.head(), gen: 1 }],
+  }, 600);
+  const meta = await finishBuild(ticket, plan);
+  assert.deepEqual([meta.repos, meta.commits], [1, 7]);
 });
