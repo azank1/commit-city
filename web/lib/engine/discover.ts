@@ -24,6 +24,9 @@ export interface Discovery {
   now: number;
   contributions: number | null;
   restricted: number;
+  // a person's public commits as GitHub's calendar counts them, and whether its list of their repos hit its
+  // cap of 100 (then some repos with their commits were never seen); null for orgs and repos
+  github: { commits: number; capped: boolean } | null;
   repos: DiscoveredRepo[];
   skipped: { name: string; reason: string; commits: number }[];
   omittedRepos: number;
@@ -78,7 +81,7 @@ const OWNER_Q = `query($login: String!, $from: DateTime!, $to: DateTime!) {
     ... on User {
       id name createdAt
       contributionsCollection(from: $from, to: $to) {
-        restrictedContributionsCount
+        restrictedContributionsCount totalCommitContributions
         contributionCalendar { totalContributions }
         commitContributionsByRepository(maxRepositories: 100) { repository { nameWithOwner isPrivate isFork } }
       }
@@ -154,7 +157,7 @@ export async function discover(target: Target, o: DiscoverOptions): Promise<Disc
   const contribFrom = now - 365 * DAY + 60;                                  // the API allows a one-year span
   const own = await gql<{ repositoryOwner: null | {
     __typename: 'User' | 'Organization'; login: string; avatarUrl: string; url: string; id: string; name: string | null; createdAt: string;
-    contributionsCollection?: { restrictedContributionsCount: number; contributionCalendar: { totalContributions: number };
+    contributionsCollection?: { restrictedContributionsCount: number; totalCommitContributions: number; contributionCalendar: { totalContributions: number };
       commitContributionsByRepository: { repository: { nameWithOwner: string; isPrivate: boolean; isFork: boolean } }[] };
     repositories: { nodes: { nameWithOwner: string; isFork: boolean; isArchived?: boolean; pushedAt: string | null }[] };
   } }>(o, OWNER_Q, { login: target.login, from: iso(contribFrom), to: iso(now) }, cost);
@@ -181,7 +184,7 @@ export async function discover(target: Target, o: DiscoverOptions): Promise<Disc
     const kept = repos.slice(0, Math.min(maxRepos, 24));            // an org's busiest repos
     const rest = repos.slice(kept.length);
     return {
-      kind: 'org', mode: 'all', target: u.login, profile, start, now, contributions: null, restricted: 0, repos: kept, skipped,
+      kind: 'org', mode: 'all', target: u.login, profile, start, now, contributions: null, restricted: 0, github: null, repos: kept, skipped,
       omittedRepos: rest.length + skipped.length, omittedCommits: [...rest, ...skipped].reduce((a, r) => a + r.commits, 0), cost: cost.n,
     };
   }
@@ -240,9 +243,12 @@ export async function discover(target: Target, o: DiscoverOptions): Promise<Disc
     slices = next;
   }
   for (const [n, set] of found) shas.set(n, [...set]);
-  // a commit that also lives in a fork counts once, in the repo where most of yours are
+  // a commit that also lives in a fork counts once: in the source repo when it is there (GitHub counts it there,
+  // and never in a fork), otherwise in the repo where most of yours are
   const seen = new Set<string>();
-  const ranked = names.filter(n => shas.get(n)?.length).sort((a, b) => shas.get(b)!.length - shas.get(a)!.length || a.localeCompare(b));
+  const fork = (n: string) => (nodes.get(n)?.isFork ? 1 : 0);
+  const ranked = names.filter(n => shas.get(n)?.length)
+    .sort((a, b) => fork(a) - fork(b) || shas.get(b)!.length - shas.get(a)!.length || a.localeCompare(b));
   const repos: DiscoveredRepo[] = [];
   for (const n of ranked) {
     const mine = shas.get(n)!.filter(s => !seen.has(s));
@@ -252,10 +258,12 @@ export async function discover(target: Target, o: DiscoverOptions): Promise<Disc
     repos.push({ name: node.nameWithOwner, head: t.oid, headTime: Date.parse(t.committedDate) / 1000, fork: node.isFork,
       diskKB: node.diskUsage ?? 0, commits: mine.length, shas: mine.map(s => s.slice(0, 12)) });
   }
+  repos.sort((a, b) => b.commits - a.commits || a.name.localeCompare(b.name));
   const kept = repos.slice(0, maxRepos), rest = repos.slice(maxRepos);
   return {
     kind: 'user', mode: 'mine', target: u.login, profile, start, now,
     contributions: cc.contributionCalendar.totalContributions, restricted: cc.restrictedContributionsCount,
+    github: { commits: cc.totalCommitContributions, capped: cc.commitContributionsByRepository.length >= 100 },
     repos: kept, skipped, omittedRepos: rest.length + skipped.length,
     omittedCommits: [...rest, ...skipped].reduce((a, r) => a + r.commits, 0), cost: cost.n,
   };
@@ -284,7 +292,7 @@ async function discoverRepo(target: Extract<Target, { kind: 'repo' }>, o: Discov
   return {
     kind: 'repo', mode: 'all', target: r.nameWithOwner,
     profile: { login: r.nameWithOwner, name: r.nameWithOwner, avatar: r.owner.avatarUrl, url: r.url, createdAt: r.createdAt },
-    start, now, contributions: null, restricted: 0,
+    start, now, contributions: null, restricted: 0, github: null,
     repos: tooBig ? [] : [repo],
     skipped: tooBig ? [{ name: repo.name, reason: `too big for the hosted builder (${Math.round(repo.diskKB / 1024)} MB)`, commits }] : [],
     omittedRepos: tooBig ? 1 : 0, omittedCommits: tooBig ? commits : 0, cost: cost.n,

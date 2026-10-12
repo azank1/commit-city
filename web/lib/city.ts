@@ -57,6 +57,7 @@ interface Plan {
   k: string; kind: Discovery['kind']; mode: Discovery['mode']; s: number; n: number;
   p: Discovery['profile']; c: number | null; x: number; o: [number, number];
   b?: [string, number][];       // the biggest repos skipped as too big to replay (counted in o), named on the city page
+  g?: Discovery['github'];      // a person's public commits as GitHub counts them, for the city's reconciliation note
   r: { n: string; f: boolean; c: number; h: string; sh?: string[] }[];
 }
 
@@ -124,6 +125,7 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
   const plan: Plan = {
     k: key, kind: d.kind, mode: d.mode, s: d.start, n: d.now, p: d.profile, c: d.contributions, x: d.restricted,
     o: [d.omittedRepos, d.omittedCommits], ...(named.length ? { b: named.map(s => [s.name, s.commits] as [string, number]) } : {}),
+    ...(d.github ? { g: d.github } : {}),
     r: repos.map(r => ({ n: r.name, f: r.fork, c: r.commits, h: r.head, ...(r.shas ? { sh: r.shas } : {}) })),
   };
   return {
@@ -174,7 +176,7 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
     payload = bundle({
       login: p.p.login, name: p.p.name, kind: p.kind, avatar: p.p.avatar, url: p.p.url,
       now: Math.floor(Date.now() / 1000), start: p.s, contributions: p.c, restricted: p.x, repos,
-      omittedRepos: p.o[0] + missing.length, omittedCommits: p.o[1] + missing.reduce((a, r) => a + r.c, 0), tooBig: p.b,
+      omittedRepos: p.o[0] + missing.length, omittedCommits: p.o[1] + missing.reduce((a, r) => a + r.c, 0), tooBig: p.b, github: p.g,
       maxRepos: 60,
     });
   } catch {
