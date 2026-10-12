@@ -24,6 +24,7 @@ export interface ReplayStats { packBytes: number; objects: number; fetches: numb
 
 const MAX_CHAIN_ROUNDS = 40;
 const MAX_SIDE_PARENTS = 400;
+const MAX_SIDE_ROUNDS = 12;     // merged branches inside merged branches
 const BLOB_LIMIT = 128 * 1024;
 const BLOBS_PER_FETCH = 4000;
 const MAX_RSS = 1.5e9;          // functions get 2 GB, and concurrent builds on one instance share it
@@ -108,6 +109,40 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
       await get({ want: m.parents[0], deepenSince: o.start, haves: [m.sha] });
     } catch (e) {
       if (!(e instanceof GitError && e.code === 'empty')) throw e;   // the parent predates the window: next round
+    }
+  }
+
+  // 2b. merged branches. deepen-since makes a commit shallow when any of its parents predates the window, and
+  //     then sends none of its parents, so a branch merged into a main that was quiet before the window (one PR
+  //     into an old repo; torvalds/uemacs) arrives as its merge commit alone. Probe each missing parent off the
+  //     first-parent chain at depth 1 to learn its date, then fetch the ones inside the window with the same cut.
+  //     Never mix old and new wants in one deepen-since fetch: GitHub then sends the old ones' whole history.
+  if (!whole) {
+    const tried = new Set<string>();
+    for (let round = 0; round < MAX_SIDE_ROUNDS && deadline - Date.now() > 20_000; round++) {
+      const chain = new Set(rp.findBase(o.head, o.start).chain.map(c => c.sha));
+      const missing: string[] = [];
+      for (const c of db.commits.values()) {
+        if (c.ct <= o.start) continue;
+        c.parents.forEach((p, i) => {
+          if ((i > 0 || !chain.has(c.sha)) && !db.commits.has(p) && !tried.has(p)) { tried.add(p); missing.push(p); }
+        });
+      }
+      if (!missing.length) break;
+      const batch = missing.slice(0, MAX_SIDE_PARENTS);
+      try {
+        await get({ want: batch, deepen: 1, haves: [o.head] });
+      } catch (e) {
+        o.log?.(`${o.repo}: merged-branch tips unavailable (${(e as Error).message})`);
+        break;
+      }
+      const inside = batch.filter(p => (db.commits.get(p)?.ct ?? 0) > o.start);
+      if (!inside.length) continue;
+      try {
+        await get({ want: inside, deepenSince: o.start, haves: [o.head] });
+      } catch (e) {
+        if (!(e instanceof GitError && e.code === 'empty')) throw e;
+      }
     }
   }
 
