@@ -27,6 +27,7 @@ export interface BundleInput {
   repos: BundleRepo[];
   omittedRepos?: number;
   omittedCommits?: number;
+  tooBig?: [string, number][];      // repos skipped as too big to replay, already counted in omittedRepos/omittedCommits
   maxRepos?: number;
   maxFilesPerRepo?: number;
   maxFilesTotal?: number;
@@ -41,7 +42,7 @@ export interface Payload {
   tz: { iana: string; offset: number; label: string };
   epoch: number; t_end: number; langs: string[];
   who: string[];                    // actors in this city: 'human', then 'bot' if any, then agent ids by commit count
-  totals: { commits: number; contributions: number | null; restricted: number; window_start: string; omitted_repos: number; omitted_commits: number };
+  totals: { commits: number; contributions: number | null; restricted: number; window_start: string; omitted_repos: number; omitted_commits: number; too_big?: { repo: string; commits: number }[] };
   repos: { n: string; fork: boolean; anon: boolean; fp: number; agg: number; p: string[]; l: number[]; e: number[][]; m: MineRow[] }[];
 }
 
@@ -215,6 +216,7 @@ export function bundle(inp: BundleInput): Payload {
       window_start: isoDay(inp.start),
       omitted_repos: omitted.length + (inp.omittedRepos ?? 0),
       omitted_commits: omitted.reduce((a, r) => a + r.mine.length, 0) + (inp.omittedCommits ?? 0),
+      ...(inp.tooBig?.length ? { too_big: inp.tooBig.map(([repo, commits]) => ({ repo, commits })) } : {}),
     },
     repos,
   };

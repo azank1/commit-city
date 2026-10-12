@@ -933,15 +933,20 @@ const el = {
   const tot = DATA.totals || {};
   const bits = [];
   if (tot.contributions != null) bits.push(`GitHub shows ${fmtInt(tot.contributions)} contributions since ${tot.window_start}; it also counts PRs, issues, reviews and private activity. Buildings show default-branch commits.`);
-  // omitted = repos past the busiest-N cap *and* repos too big to replay (torvalds/linux), so no "smaller"
-  if (tot.omitted_repos) bits.push(`${tot.omitted_repos} more ${tot.omitted_repos === 1 ? 'repo' : 'repos'} (${fmtInt(tot.omitted_commits)} commits) not drawn: the very largest are skipped, and only the busiest are shown.`);
+  // the repos too big to replay are named, because one of them can be most of a person's year (torvalds/linux)
+  const big = Array.isArray(tot.too_big) ? tot.too_big : [];
+  const skip = big.length ? `Not drawn, too big for the hosted builder: ${big.map(b => `${b.repo} (${fmtInt(b.commits)} commits)`).join(', ')}.` : '';
+  // the rest = repos past the busiest-N cap *and* any further too-big ones, so no "smaller"
+  const rest = (tot.omitted_repos || 0) - big.length, restCommits = (tot.omitted_commits || 0) - big.reduce((a, b) => a + b.commits, 0);
+  if (rest > 0) bits.push(`${rest} ${big.length ? 'more ' : ''}${rest === 1 ? 'repo' : 'repos'} (${fmtInt(restCommits)} commits) not drawn: the very largest are skipped, and only the busiest are shown.`);
   if (!PERSONAL) {
     for (const [sel, text] of [['#f-commits + label', 'commits'], ['.side-head span', 'repos · commits so far'], ['.tick-labels span:nth-child(2)', 'commits per hour']]) {
       const n = document.querySelector(sel); if (n) n.textContent = text;
     }
   }
-  $('contrib-note').textContent = bits.join(' ');
-  $('contrib-note').hidden = !bits.length;
+  const note = $('contrib-note');
+  note.replaceChildren(...(skip ? [Object.assign(document.createElement('b'), { textContent: skip })] : []), bits.join(' '));
+  note.hidden = !skip && !bits.length;
 }
 const speedBtns = [];
 SPEEDS.forEach((s, k) => {

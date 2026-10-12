@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { finishBuild, GALLERY, type GalleryEntry, repoPath } from '../lib/city';
-import { aggregate, budgetCaps, bundle, mergeEvents, mineOf } from '../lib/engine/bundle';
+import { aggregate, budgetCaps, bundle, mergeEvents, mineOf, type Payload } from '../lib/engine/bundle';
 import { replayRepo } from '../lib/engine/repo';
 import type { RepoRecord } from '../lib/engine/replay';
 import { sign } from '../lib/secret';
@@ -125,7 +125,8 @@ test('finish step: records of another version are never drawn; meta and gallery 
   const ticket = sign({ k: 'me', t: 'me', s: start, w: false, r: [['me/alpha', r.head(), 0], ['me/beta', 'b'.repeat(40), 0]] }, 600);
   const plan = sign({
     k: 'me', kind: 'org', mode: 'all', s: start, n: T0 + 30 * DAY, p: { login: 'me', name: 'Me', avatar: '', url: '', createdAt: '' },
-    c: null, x: 0, o: [0, 0], r: [{ n: 'me/alpha', f: false, c: 7, h: r.head() }, { n: 'me/beta', f: false, c: 5, h: 'b'.repeat(40) }],
+    c: null, x: 0, o: [1, 900], b: [['me/huge', 900]],
+    r: [{ n: 'me/alpha', f: false, c: 7, h: r.head() }, { n: 'me/beta', f: false, c: 5, h: 'b'.repeat(40) }],
   }, 600);
   const meta = await finishBuild(ticket, plan);
   assert.equal(meta.repos, 1);
@@ -133,7 +134,9 @@ test('finish step: records of another version are never drawn; meta and gallery 
   assert.deepEqual(meta.who, { human: 1, bot: 1, agent: 5, agents: [['claude', 2], ['copilot', 2], ['cursor', 1]] });
   const gallery = (await getJSON<GalleryEntry[]>(GALLERY))!;
   assert.deepEqual([gallery[0].agent, gallery[0].bot], [0.714, 0.143]);
-  const payload = (await getJSON<{ who: string[]; totals: { omitted_repos: number; omitted_commits: number } }>(`cities/me/${meta.v}.json.gz`))!;
+  const payload = (await getJSON<Payload>(`cities/me/${meta.v}.json.gz`))!;
   assert.deepEqual(payload.who, ['human', 'bot', 'claude', 'copilot', 'cursor']);
-  assert.deepEqual([payload.totals.omitted_repos, payload.totals.omitted_commits], [1, 5]);
+  // me/beta's record is unusable, so it joins the too-big repo discovery skipped; only the latter is named
+  assert.deepEqual([payload.totals.omitted_repos, payload.totals.omitted_commits], [2, 905]);
+  assert.deepEqual(payload.totals.too_big, [{ repo: 'me/huge', commits: 900 }]);
 });

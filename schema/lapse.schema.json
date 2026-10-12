@@ -51,7 +51,16 @@
         "restricted": { "type": "integer" },
         "window_start": { "type": "string" },
         "omitted_repos": { "type": "integer" },
-        "omitted_commits": { "type": "integer" }
+        "omitted_commits": { "type": "integer" },
+        "too_big": {
+          "type": "array",
+          "description": "The biggest repos left out because they are too big for the hosted builder to replay, most commits first; already counted in omitted_repos and omitted_commits. Absent when none were",
+          "items": {
+            "type": "object",
+            "required": ["repo", "commits"],
+            "properties": { "repo": { "type": "string" }, "commits": { "type": "integer" } }
+          }
+        }
       }
     },
     "repos": {
