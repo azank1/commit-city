@@ -203,6 +203,38 @@ test('a merge of a branch older than the window does not cut the chain short', a
   assert.ok(stats.fetches <= 6, `fetches ${stats.fetches}`);
 });
 
+test('a branch merged into a main that was quiet before the window keeps all its commits', async () => {
+  // torvalds/uemacs: main untouched since 2021, a year of work on a branch, then one merge. deepen-since makes
+  // the merge shallow (its first parent is old) and sends neither parent, so the branch used to vanish.
+  const root = tmpdir();
+  const r = new Repo(path.join(root, 'quiet'));
+  r.write('main.c', 10).write('README', 2);
+  r.commit(T0);
+  r.write('main.c', 11);
+  r.commit(T0 + 1 * DAY);
+  r.checkout('-b', 'work');
+  const work: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    r.write('main.c', 12 + i).write(`lib/m${i}.c`, 3 + i);
+    work.push(r.commit(T0 + (12 + i) * DAY, 'Linus', '-0700'));
+  }
+  r.checkout('-b', 'side', work[1]);                                  // a branch merged into the branch
+  r.write('side.c', 5);
+  const side = r.commit(T0 + 13 * DAY + 3600, 'Ann');
+  r.checkout('work');
+  const inner = r.merge('side', T0 + 16 * DAY, 'Linus', '-0700');
+  r.checkout('main');
+  const head = r.merge('work', T0 + 17 * DAY, 'Linus', '-0700');      // first parent: main at T0 + 1 day
+  const bare = r.bare();
+  const start = T0 + 10 * DAY;
+  const { record, stats } = await replayRepo({ repo: 'test/quiet', head, start, transport: localTransport(bare) });
+  const got = new Set(record.commits.map(c => c[0]));
+  for (const sha of [...work, side, inner, head]) assert.ok(got.has(sha.slice(0, 12)), `missing ${sha.slice(0, 7)}`);
+  assert.equal(record.commits.length, 7);
+  compare(record, pythonReplay(bare, start, record.commits.map(c => c[0])));
+  assert.ok(stats.fetches <= 8, `fetches ${stats.fetches}`);
+});
+
 test('a replay that outgrows its memory stops with too_big instead of taking the instance down', async () => {
   const root = tmpdir();
   const r = scenario(path.join(root, 'repo'));
