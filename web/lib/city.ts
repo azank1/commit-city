@@ -56,6 +56,7 @@ interface Ticket { k: string; t: string; s: number; w: boolean; r: [string, stri
 interface Plan {
   k: string; kind: Discovery['kind']; mode: Discovery['mode']; s: number; n: number;
   p: Discovery['profile']; c: number | null; x: number; o: [number, number];
+  b?: [string, number][];       // the biggest repos skipped as too big to replay (counted in o), named on the city page
   r: { n: string; f: boolean; c: number; h: string; sh?: string[] }[];
 }
 
@@ -117,11 +118,12 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
   if (!repos.length && big.length) {
     throw new HttpError(422, `${big[0].name} is too big for the hosted builder`, { status: 'too_big', skipped: big.slice(0, 5) });
   }
+  const named = big.filter(s => !excluded.has(s.name.toLowerCase())).sort((a, b) => b.commits - a.commits).slice(0, 3);
   const cached = await Promise.all(repos.map(r => exists(repoPath(r.name, r.head, whole))));
   const ticket: Ticket = { k: key, t: d.target, s: whole ? 0 : Math.min(d.start, replayStart(d.now)), w: whole, r: repos.map(r => [r.name, r.head, r.headTime]) };
   const plan: Plan = {
     k: key, kind: d.kind, mode: d.mode, s: d.start, n: d.now, p: d.profile, c: d.contributions, x: d.restricted,
-    o: [d.omittedRepos, d.omittedCommits],
+    o: [d.omittedRepos, d.omittedCommits], ...(named.length ? { b: named.map(s => [s.name, s.commits] as [string, number]) } : {}),
     r: repos.map(r => ({ n: r.name, f: r.fork, c: r.commits, h: r.head, ...(r.shas ? { sh: r.shas } : {}) })),
   };
   return {
@@ -172,7 +174,7 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
     payload = bundle({
       login: p.p.login, name: p.p.name, kind: p.kind, avatar: p.p.avatar, url: p.p.url,
       now: Math.floor(Date.now() / 1000), start: p.s, contributions: p.c, restricted: p.x, repos,
-      omittedRepos: p.o[0] + missing.length, omittedCommits: p.o[1] + missing.reduce((a, r) => a + r.c, 0),
+      omittedRepos: p.o[0] + missing.length, omittedCommits: p.o[1] + missing.reduce((a, r) => a + r.c, 0), tooBig: p.b,
       maxRepos: 60,
     });
   } catch {
