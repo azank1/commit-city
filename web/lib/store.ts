@@ -57,8 +57,9 @@ class BlobStore implements Store {
   }
   async put(pathname: string, data: Buffer, o: PutOptions) {
     try {
+      // a conditional write is an overwrite: the SDK refuses ifMatch beside allowOverwrite: false
       const r = await blobPut(pathname, data, {
-        access: 'public', addRandomSuffix: false, allowOverwrite: o.overwrite ?? false,
+        access: 'public', addRandomSuffix: false, allowOverwrite: o.overwrite ?? o.ifMatch !== undefined,
         contentType: o.contentType, cacheControlMaxAge: o.maxAge ?? 31536000, ...(o.ifMatch ? { ifMatch: o.ifMatch } : {}),
       });
       return r.url;
