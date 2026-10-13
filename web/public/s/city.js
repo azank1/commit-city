@@ -210,7 +210,14 @@
     let meta;
     try {
       meta = await call('/api/build/finish', { ticket: st.ticket, plan: st.plan });
-    } catch (e) { clearInterval(clock); return fail(e); }
+    } catch (e) {
+      clearInterval(clock);
+      // nothing drawable because replays failed: each failed repo's own reason is the one its row showed
+      if (e.info && e.info.status === 'repo_failed') {
+        for (const s of e.info.skipped || []) { const j = jobs.find(x => x.name === s.name && x.s === 'bad'); if (j) s.reason = j.note; }
+      }
+      return fail(e);
+    }
     clearInterval(clock);
     if (history.replaceState) history.replaceState(null, '', pagePath() + location.hash);
     await open(meta);
@@ -237,6 +244,15 @@
         Replaying ${big.commits ? `its ${fmt(big.commits)} commits from the last year` : 'its history'} would run past what one build may take;
         for now the hosted builder takes repos up to about 1.5 GB.</p>
         <div class="cc-actions">${owner ? `<a class="cc-primary" href="/${esc(owner)}">See ${esc(owner)}'s city</a>` : ''}<a href="/explore">Explore other cities</a></div>${foot}`);
+    }
+    if (s === 'repo_failed') {
+      tellParent('missing');
+      const bad = (info.skipped || [])[0] || {};
+      const owner = isRepo ? CC.target.split('/')[0] : '';
+      const heavy = /too big|too long/.test(bad.reason || '');      // not for a fetch that failed or a busy builder
+      return show(`${head('commit.city', CC.target)}<p class="cc-sub"><b>${esc(bad.name || CC.target)}</b> could not be replayed${bad.reason ? `: ${esc(bad.reason)}` : ''}.
+        ${bad.commits ? `It has ${fmt(bad.commits)} commits from the last year${heavy ? ', more than one hosted build can replay' : ''}.` : ''}</p>
+        <div class="cc-actions"><button class="cc-primary" id="cc-retry">Try again</button>${owner ? `<a href="/${esc(owner)}">See ${esc(owner)}'s city</a>` : ''}<a href="/explore">Explore other cities</a></div>${foot}`), wireRetry();
     }
     if (s === 'empty') {
       const whole = isRepo && !CC.all;

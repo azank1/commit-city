@@ -8,6 +8,7 @@ import { finishBuild, readGallery, REPLAY_GEN, repoPath, usableGen } from '../li
 import { aggregate, budgetCaps, bundle, mergeEvents, mineOf, type Payload } from '../lib/engine/bundle';
 import { replayRepo } from '../lib/engine/repo';
 import type { RepoRecord } from '../lib/engine/replay';
+import { HttpError } from '../lib/http';
 import { sign } from '../lib/secret';
 import { getJSON, putJSON, setStore, type Store, StoreConflict } from '../lib/store';
 import { localTransport, Repo, REPO_ROOT, sh, tmpdir } from './helpers';
@@ -149,6 +150,27 @@ test('finish step: records of another version are never drawn; meta and gallery 
   assert.deepEqual(payload.totals.too_big, [{ repo: 'me/huge', commits: 900 }]);
   assert.deepEqual(payload.totals.github, { commits: 950 });            // GitHub's count rides along; capped only when true
   assert.equal((await getJSON<{ v: number }>('meta/old-me.json'))?.v, meta.v);   // the name the build was asked for points here
+});
+
+test('finish step: a city whose replays all failed names them, instead of claiming no commits', async () => {
+  setStore(new MemStore());
+  const start = T0 + 2 * DAY, head = 'c'.repeat(40);
+  const plan = (r: object[]) => sign({
+    k: 'rust-lang/rust', kind: 'repo', mode: 'all', s: start, n: T0 + 30 * DAY,
+    p: { login: 'rust-lang/rust', name: 'rust-lang/rust', avatar: '', url: '', createdAt: '' }, c: null, x: 0, o: [0, 0], r,
+  }, 600);
+  const ticket = sign({ k: 'rust-lang/rust', t: 'rust-lang/rust', s: start, w: false, r: [['rust-lang/rust', head, 0, 1_021_559]] }, 600);
+  // its replay failed, so there is no record: 34,368 commits are not "no commits"
+  await assert.rejects(finishBuild(ticket, plan([{ n: 'rust-lang/rust', f: false, c: 34_368, h: head }])), (e: unknown) => {
+    assert.ok(e instanceof HttpError);
+    assert.equal(e.status, 422);
+    assert.equal(e.extra.status, 'repo_failed');
+    assert.equal(e.message, 'rust-lang/rust could not be replayed');
+    assert.deepEqual(e.extra.skipped, [{ name: 'rust-lang/rust', commits: 34_368 }]);
+    return true;
+  });
+  // nothing failed and nothing to draw: that one is empty
+  await assert.rejects(finishBuild(ticket, plan([])), (e: unknown) => e instanceof HttpError && e.extra.status === 'empty' && e.message === 'no commits in the last year');
 });
 
 test('a generation-1 record stays in use only where the merged-branch fix cannot change it', async () => {
