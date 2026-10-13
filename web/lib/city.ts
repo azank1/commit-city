@@ -227,6 +227,12 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
       maxRepos: 60,
     });
   } catch {
+    // nothing to draw. Repos whose replays failed have commits (rust-lang/rust: 34,368 in the year, too big at
+    // replay time though under the size cap), so "no commits" would be false: name them. The page has the reasons.
+    const failed = missing.filter(r => r.c > 0).sort((a, b) => b.c - a.c);
+    if (failed.length) {
+      throw new HttpError(422, `${failed[0].n} could not be replayed`, { status: 'repo_failed', skipped: failed.slice(0, 5).map(r => ({ name: r.n, commits: r.c })) });
+    }
     throw new HttpError(422, p.kind === 'user' ? 'no public commits on default branches in the last year' : 'no commits in the last year', { status: 'empty' });
   }
   const v = Date.now();
