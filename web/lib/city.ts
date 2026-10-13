@@ -2,6 +2,7 @@
 import { bundle, mineOf, type Payload } from './engine/bundle.js';
 import { discover, type Discovery, NotFound, RateLimited, type Target } from './engine/discover.js';
 import { GitError } from './engine/git.js';
+import { collectGarbage } from './engine/memory.js';
 import { RECORD_VERSION, type RepoRecord } from './engine/replay.js';
 import { replayRepo } from './engine/repo.js';
 import { HttpError } from './http.js';
@@ -169,10 +170,12 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
 // Fluid compute runs concurrent requests in one process, 2 GB between them. Big replays side by side can outgrow
 // that together though each fits alone (every client sends a city's biggest repos first, four at a time), so
 // they take turns; small repos, most of any city, never wait. A request that waits too long is told the builder
-// is busy, and the page asks again.
+// is busy, and the page asks again. Each turn starts with a thorough collection: what the last big replay left is
+// garbage until V8 gets to it, and its pooled pages stay resident until V8 is told to give them back.
 const HEAVY_KB = 16 * 1024;
 const TURN_WAIT_MS = 150_000;      // the function has 300 s: this leaves a replay that waited the whole time 130
 const heavy = new Turns();
+const mb = (n: number) => (n / 1e6).toFixed(0);
 
 export async function buildRepo(ticketToken: string, name: string) {
   const t0 = Date.now();
@@ -187,6 +190,12 @@ export async function buildRepo(ticketToken: string, name: string) {
   if (big && !(await heavy.take(TURN_WAIT_MS))) throw new HttpError(503, 'the builder is busy with other big repos', { status: 'busy' });
   try {
     if (big && Date.now() - t0 > 2000 && await exists(path)) return { cached: true };   // replayed for another build meanwhile
+    if (big) {
+      const a = process.memoryUsage();
+      collectGarbage(true);
+      const b = process.memoryUsage();
+      console.log(`${repo}: big replay's turn after ${Date.now() - t0} ms; collected: live ${mb(a.heapUsed + a.external)} -> ${mb(b.heapUsed + b.external)} MB, rss ${mb(a.rss)} -> ${mb(b.rss)} MB`);
+    }
     const { record, stats } = await replayRepo({
       repo, head, headTime, start: t.s, timeoutMs: Math.min(240_000, 280_000 - (Date.now() - t0)), maxPackBytes: 400e6,
       token: process.env.GITHUB_TOKEN, log: m => console.log(m),
@@ -196,7 +205,7 @@ export async function buildRepo(ticketToken: string, name: string) {
   } catch (e) {
     if (e instanceof GitError) {
       const m = process.memoryUsage();
-      console.log(`${repo}: ${e.code}: ${e.message}; live ${((m.heapUsed + m.external) / 1e6).toFixed(0)} MB, rss ${(m.rss / 1e6).toFixed(0)} MB, ${heavy.waiting} waiting`);
+      console.log(`${repo}: ${e.code}: ${e.message}; live ${mb(m.heapUsed + m.external)} MB, rss ${mb(m.rss)} MB, ${heavy.waiting} waiting`);
       if (e.code === 'busy') throw new HttpError(503, 'the builder is short of memory right now', { status: 'busy' });
       const reason = e.code === 'too_big' ? 'too big for the hosted builder' : e.code === 'timeout' ? 'took too long to replay'
         : e.code === 'not_found' ? 'not readable' : `fetch failed (${e.message.slice(0, 120)})`;
