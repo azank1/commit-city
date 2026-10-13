@@ -22,6 +22,10 @@ export const GET = handle(async req => {
   const key = cityKey(target, all);
   const meta = await readMeta(key).catch(() => null);
   const name = target.kind === 'owner' ? target.login : `${target.owner}/${target.name}`;
+  // a repo GitHub moved (facebook/react is react/react now) opens under its current name, as on GitHub
+  if (meta && meta.target.toLowerCase() !== name.toLowerCase()) {
+    return new Response(null, { status: 307, headers: { Location: `/${meta.target}${all ? '?all=1' : ''}`, 'Cache-Control': 'public, s-maxage=300' } });
+  }
   const shown = meta?.target ?? name;
   const path = `/${shown}${all ? '?all=1' : ''}`;
   const title = `${shown}${all ? ' (whole history)' : ''} · commit city`;
