@@ -8,6 +8,11 @@
     "api/build/finish.ts": { "maxDuration": 120 },
     "api/og.ts": { "maxDuration": 30, "includeFiles": "fonts/**" }
   },
+  "redirects": [
+    { "source": "/orgs/:org([A-Za-z0-9][A-Za-z0-9-]{0,38})/:rest*", "destination": "/:org", "permanent": false },
+    { "source": "/:owner((?!(?:api|v|s|u|fonts|local-store|explore|events|readme|about|404|index)(?:/|$))[A-Za-z0-9][A-Za-z0-9-]{0,38})/:repo([A-Za-z0-9._-]{1,96})\\.git", "destination": "/:owner/:repo", "permanent": false },
+    { "source": "/:owner((?!(?:api|v|s|u|fonts|local-store|explore|events|readme|about|404|index)(?:/|$))[A-Za-z0-9][A-Za-z0-9-]{0,38})/:repo([A-Za-z0-9._-]{1,100})/:rest+", "destination": "/:owner/:repo", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/api/auth/:op(login|callback|logout)", "destination": "/api/account?op=:op" },
     { "source": "/api/:op(me|settings)", "destination": "/api/account?op=:op" },
