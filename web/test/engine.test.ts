@@ -1,9 +1,11 @@
 // The hosted engine must draw the same city as the Python pipeline: replay synthetic repos through a
 // real `git upload-pack` (protocol v2, shallow) and compare against commit_city.extract.replay.
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { test } from 'node:test';
 import { GitError } from '../lib/engine/git';
+import { collectGarbage } from '../lib/engine/memory';
 import { replayRepo } from '../lib/engine/repo';
 import type { RepoRecord } from '../lib/engine/replay';
 import { localTransport, pythonReplay, Repo, tmpdir } from './helpers';
@@ -237,10 +239,26 @@ test('a branch merged into a main that was quiet before the window keeps all its
 
 test('a replay that outgrows its memory stops with too_big instead of taking the instance down', async () => {
   const root = tmpdir();
-  const r = scenario(path.join(root, 'repo'));
-  // any real process holds over 1 byte, even after a collection: the guard inside the replay loop must fire after the fetch succeeded
-  await assert.rejects(replayRepo({ repo: 'test/repo', head: r.head(), start: 0, transport: localTransport(r.bare()), maxLiveBytes: 1 }),
+  const r = new Repo(path.join(root, 'repo'));
+  r.write('data.bin', 0, randomBytes(4e6)).write('a.txt', 3);
+  r.commit(T0);
+  const head = r.head(), transport = localTransport(r.bare());
+  // its own 4 MB pack, all blobs in it, against a 1 MB limit. Collected first, so garbage from before (the clone
+  // above, earlier tests) is not in the starting point the replay is measured from, to be freed under it
+  collectGarbage();
+  await assert.rejects(replayRepo({ repo: 'test/repo', head, start: 0, transport, blobLimit: 0, maxLiveBytes: 1e6 }),
     (e: unknown) => e instanceof GitError && e.code === 'too_big' && /memory/.test(e.message));
+});
+
+test('memory another request holds does not make a replay too big', async () => {
+  const root = tmpdir();
+  const r = scenario(path.join(root, 'repo'));
+  // google/dawn's first fetch read 1,196 MB live in production, where it was then refused as too big, and 484 MB
+  // replayed alone: the rest was other requests'. 200 MB held throughout, against a 100 MB limit
+  const other = Array.from({ length: 50 }, () => Buffer.alloc(4e6, 1));
+  const { record } = await replayRepo({ repo: 'test/repo', head: r.head(), start: 0, transport: localTransport(r.bare()), maxLiveBytes: 100e6 });
+  assert.ok(record.commits.length > 0);
+  assert.equal(other.length, 50);
 });
 
 test('a full instance makes a replay busy, to be asked again, not too big', async () => {
