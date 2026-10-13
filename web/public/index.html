@@ -113,11 +113,12 @@
 .livebig label i { width: 8px; height: 8px; border-radius: 2px; }
 #lv-note { display: block; margin-top: 8px; font-size: 12px; }
 .feed { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 2px; min-height: 456px; }
-.feed li { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 6px 4px; border-radius: 8px; font-size: 13px; color: var(--ink-2); animation: feedin 0.5s var(--ease); }
+.feed li { display: grid; grid-template-columns: 24px 1fr auto auto; gap: 10px; align-items: center; padding: 6px 4px; border-radius: 8px; font-size: 13px; color: var(--ink-2); animation: feedin 0.5s var(--ease); }
 .feed li img { width: 24px; height: 24px; border-radius: 50%; background: var(--bg-3); }
 .feed li .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed li .tx b { color: var(--ink); font-weight: 600; }
 .feed li .tg { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+.feed li time { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 3.4em; text-align: right; }
 @keyframes feedin { from { opacity: 0; transform: translateY(-6px); } }
 .livecard .roster { grid-column: 1 / -1; padding-top: 20px; border-top: 1px solid var(--line); }
 .roster small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 10px; }
@@ -249,10 +250,11 @@
   <div class="wrap">
     <div class="card livecard rv">
       <div>
-        <span class="kick" style="color:var(--good)"><i class="live-dot" style="margin-right:2px"></i>GitHub, right now</span>
+        <span class="kick" style="color:var(--good)"><i class="live-dot" style="margin-right:2px"></i>GitHub's public timeline</span>
         <h2 class="h2">Who's writing the code, live.</h2>
-        <p>The latest public events on all of GitHub, sorted by who sent them. commit.city reads the signatures bots and AI agents leave (bot accounts,
-          agent branches, <span class="mono">Co-authored-by</span> trailers). Press <kbd>A</kbd> in any city for the same split.</p>
+        <p>The latest public events GitHub has published, in the order they happened, sorted by who sent them: AI agents by their accounts and the
+          branches they push (<span class="mono">copilot/</span>, <span class="mono">claude/</span>, …), other bots by their <span class="mono">[bot]</span> accounts.
+          Cities also read <span class="mono">Co-authored-by</span> trailers; press <kbd>A</kbd> in any city for its split.</p>
         <div class="livebig">
           <div><b id="lv-h">–</b><label><i style="background:var(--human)"></i>humans</label></div>
           <div><b id="lv-b">–</b><label><i style="background:var(--bot)"></i>bots</label></div>
@@ -397,12 +399,12 @@ commit-city build --login <span class="v">you</span> --include-private
 const { $, esc, avatarOf, gallery, tile, skeleton } = window.CCSite;
 
 // ── try chips + hero stage tabs
-const TRY = [['sindresorhus', 'person'], ['torvalds', 'person'], ['vercel', 'org'], ['facebook/react', 'repo']];
+const TRY = [['sindresorhus', 'person'], ['torvalds', 'person'], ['vercel', 'org'], ['react/react', 'repo']];
 $('#try').innerHTML = TRY.map(([t, k]) => `<a class="chip" href="/${t}"><img src="${avatarOf(t.split('/')[0], 48)}" alt="" loading="lazy">${esc(t)}</a>`).join('');
 const STAGE = [
   { t: 'sindresorhus', label: 'sindresorhus', kind: 'person' },
   { t: 'vercel', label: 'vercel', kind: 'org' },
-  { t: 'facebook/react', label: 'facebook/react', kind: 'repo' },
+  { t: 'react/react', label: 'react/react', kind: 'repo' },
 ];
 const stage = $('#stage'), poster = $('#poster'), shield = $('#shield');
 let cur = -1, live = false;
@@ -545,9 +547,18 @@ function iso() {
 }
 
 // ── live sample of GitHub's public timeline
-const pct = x => `${Math.round(x * 100)}%`;
+// whole percentages that add up to 100 (largest remainder): rounded one by one, 74 + 16 + 11 read 101%
+function shares(counts) {
+  const n = counts.reduce((a, b) => a + b, 0);
+  if (!n) return counts.map(() => 0);
+  const exact = counts.map(c => (100 * c) / n), out = exact.map(Math.floor);
+  let left = 100 - out.reduce((a, b) => a + b, 0);
+  for (const [, i] of exact.map((x, i) => [x - out[i], i]).sort((p, q) => q[0] - p[0])) if (left-- > 0) out[i]++;
+  return out;
+}
 const KIND = { bot: ['bot', 'var(--bot)'], agent: ['agent', 'var(--agent)'] };
-let queue = [], shown = [], AG = {};
+let queue = [], shown = [], AG = {}, clock = 0;      // clock: the server's time minus ours, from the last pull
+const ago = s => (s < 90 ? `${Math.max(1, Math.round(s))}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`);
 const FEED_ROWS = matchMedia('(max-width: 640px)').matches ? 8 : 12;
 async function pullLive() {
   try {
@@ -555,19 +566,22 @@ async function pullLive() {
     if (!r.ok) throw new Error();
     const d = await r.json();
     AG = d.agents || {};
-    const n = d.events.length || 1;
     const c = { h: 0, b: 0, a: 0 };
     for (const e of d.events) c[e.who === 'bot' ? 'b' : e.who ? 'a' : 'h']++;
-    $('#lv-h').textContent = pct(c.h / n); $('#lv-b').textContent = pct(c.b / n); $('#lv-a').textContent = pct(c.a / n);
+    const [h, b, a] = shares([c.h, c.b, c.a]);
+    $('#lv-h').textContent = `${h}%`; $('#lv-b').textContent = `${b}%`; $('#lv-a').textContent = `${a}%`;
     const sp = $('#lv-split').children; sp[0].style.flexGrow = c.h; sp[1].style.flexGrow = c.b; sp[2].style.flexGrow = c.a;
-    $('#lv-note').textContent = `of the last ${d.events.length} public events`;
-    const fresh = d.events.filter(e => !shown.includes(e.id)).sort((a, b) => a.t - b.t);
-    // agents first: that's the story
-    queue = [...fresh.filter(e => e.who && e.who !== 'bot'), ...fresh.filter(e => !e.who || e.who === 'bot')].slice(0, 40);
+    clock = d.at - Date.now() / 1000;
+    // GitHub publishes its timeline minutes behind; say how far, rather than call it "right now"
+    $('#lv-note').textContent = `of the last ${d.events.length} public events GitHub has published · newest ${ago(d.at - d.newest)} ago`;
+    // in the order they happened, so the feed shows agents and bots at the share the numbers above give them
+    queue = d.events.filter(e => !shown.includes(e.id)).sort((a, b) => a.t - b.t).slice(-40);
   } catch { $('#lv-note').textContent = 'live sample unavailable right now'; }
 }
-const VERB = { push: 'pushed to', pr: 'opened a PR in', merge: 'merged a PR in', issue: 'opened an issue in', comment: 'commented in', review: 'reviewed a PR in',
-  star: 'starred', fork: 'forked', release: 'released', create: 'created', delete: 'deleted a branch in', public: 'open-sourced' };
+const VERB = { push: 'pushed to', merge: 'merged a PR in', comment: 'commented in', review: 'reviewed a PR in',
+  star: 'starred', fork: 'forked', release: 'released', public: 'open-sourced' };
+const DID = { opened: 'opened', closed: 'closed', reopened: 'reopened' };
+const ref = e => (e.rt === 'tag' ? 'a tag' : 'a branch');     // create/delete: a branch, a tag, or (create) the repository itself
 function drip() {
   const e = queue.shift();
   if (!e) return;
@@ -576,9 +590,11 @@ function drip() {
   const tag = e.who === 'bot' ? `<span class="tg" style="color:var(--bot);border-color:rgba(255,180,84,.4)">bot</span>` :
     e.who ? `<span class="tg" style="color:${esc(AG[e.who]?.color || 'var(--agent)')};border-color:color-mix(in srgb,currentColor 45%,transparent)">${esc(AG[e.who]?.label || e.who)}</span>` : '<span></span>';
   const li = document.createElement('li');
-  const verb = e.type === 'pr' ? (e.act === 'opened' ? 'opened a PR in' : e.act === 'closed' ? 'closed a PR in' : 'updated a PR in')
-    : e.type === 'issue' ? (e.act === 'opened' ? 'opened an issue in' : e.act === 'closed' ? 'closed an issue in' : 'updated an issue in') : VERB[e.type] || 'touched';
-  li.innerHTML = `<img src="https://avatars.githubusercontent.com/u/${e.aid}?s=48" alt="" loading="lazy"><span class="tx"><b>${esc(e.actor)}</b> ${verb} <b>${esc(e.repo)}</b></span>${tag}`;
+  const verb = e.type === 'pr' ? `${DID[e.act] || 'updated'} a PR in` : e.type === 'issue' ? `${DID[e.act] || 'updated'} an issue in`
+    : e.type === 'create' ? (e.rt === 'repository' ? 'created' : `created ${ref(e)} in`) : e.type === 'delete' ? `deleted ${ref(e)} in` : VERB[e.type] || 'touched';
+  const at = new Date(e.t * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  li.innerHTML = `<img src="https://avatars.githubusercontent.com/u/${e.aid}?s=48" alt="" loading="lazy"><span class="tx"><b>${esc(e.actor)}</b> ${verb} <b>${esc(e.repo)}</b></span>${tag}`
+    + `<time datetime="${new Date(e.t * 1000).toISOString()}" title="${at}">${ago(Date.now() / 1000 + clock - e.t)}</time>`;
   feed.prepend(li);
   while (feed.children.length > FEED_ROWS) feed.lastElementChild.remove();
 }
