@@ -2,7 +2,9 @@
 import { type GalleryEntry, readGallery, readMeta } from '../city.js';
 import { handle, json } from '../http.js';
 
-const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'react/react', 'denoland/deno', 'gaearon', 'karpathy', 'rust-lang/rust', 'withastro', 'antfu'];
+// every one must be a city the hosted builder can replay, or its slot stays empty: rust-lang/rust, under the size
+// cap, still outgrows the builder's memory at replay time
+const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'react/react', 'denoland/deno', 'gaearon', 'karpathy', 'golang/go', 'withastro', 'antfu'];
 
 // a city built under a repo's old name (facebook/react, now react/react) is a second city of the same repo: the
 // list shows the one under the name GitHub uses now
