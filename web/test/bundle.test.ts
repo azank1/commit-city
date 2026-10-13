@@ -1,14 +1,15 @@
 // The TS bundle must produce the same payload as commit_city/bundle.py from the same records.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { finishBuild, GALLERY, type GalleryEntry, REPLAY_GEN, repoPath, usableGen } from '../lib/city';
+import { finishBuild, readGallery, REPLAY_GEN, repoPath, usableGen } from '../lib/city';
 import { aggregate, budgetCaps, bundle, mergeEvents, mineOf, type Payload } from '../lib/engine/bundle';
 import { replayRepo } from '../lib/engine/repo';
 import type { RepoRecord } from '../lib/engine/replay';
 import { sign } from '../lib/secret';
-import { getJSON, putJSON, setStore, type Store } from '../lib/store';
+import { getJSON, putJSON, setStore, type Store, StoreConflict } from '../lib/store';
 import { localTransport, Repo, REPO_ROOT, sh, tmpdir } from './helpers';
 
 const DAY = 86400;
@@ -101,11 +102,15 @@ test('aggregate helpers match the python rules', () => {
 
 class MemStore implements Store {
   blobs = new Map<string, Buffer>();
+  types = new Map<string, string>();
   async get(p: string) { return this.blobs.get(p) ?? null; }
   async exists(p: string) { return this.blobs.has(p); }
-  async put(p: string, data: Buffer, o: { overwrite?: boolean }) {
-    if (!o.overwrite && this.blobs.has(p)) throw new Error(`blob exists: ${p}`);
+  async stat(p: string) { const b = this.blobs.get(p); return b ? { type: this.types.get(p)!, etag: createHash('sha1').update(b).digest('hex') } : null; }
+  async put(p: string, data: Buffer, o: { contentType: string; overwrite?: boolean; ifMatch?: string }) {
+    if (o.ifMatch !== undefined) { if ((await this.stat(p))?.etag !== o.ifMatch) throw new StoreConflict(`${p} changed`); }
+    else if (!o.overwrite && this.blobs.has(p)) throw new Error(`blob exists: ${p}`);
     this.blobs.set(p, data);
+    this.types.set(p, o.contentType);
     return this.url(p);
   }
   url(p: string) { return `mem:/${p}`; }
@@ -135,7 +140,7 @@ test('finish step: records of another version are never drawn; meta and gallery 
   assert.equal(meta.repos, 1);
   assert.equal(meta.commits, 7);                                    // k = 2..8, everyone's
   assert.deepEqual(meta.who, { human: 1, bot: 1, agent: 5, agents: [['claude', 2], ['copilot', 2], ['cursor', 1]] });
-  const gallery = (await getJSON<GalleryEntry[]>(GALLERY))!;
+  const gallery = await readGallery();
   assert.deepEqual([gallery[0].agent, gallery[0].bot], [0.714, 0.143]);
   const payload = (await getJSON<Payload>(`cities/me/${meta.v}.json.gz`))!;
   assert.deepEqual(payload.who, ['human', 'bot', 'claude', 'copilot', 'cursor']);

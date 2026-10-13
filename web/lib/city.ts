@@ -7,7 +7,7 @@ import { replayRepo } from './engine/repo.js';
 import { HttpError } from './http.js';
 import { sign, verify } from './secret.js';
 import { type Sky, skyline } from './skyline.js';
-import { getJSON, getStore, putJSON } from './store.js';
+import { getJSON, getStore, putJSON, StoreConflict } from './store.js';
 import { cityKey } from './target.js';
 
 // the record version is part of the key, so records of an older shape are cache misses and get replayed again.
@@ -55,6 +55,7 @@ export interface GalleryEntry {
   agent: number; bot: number;     // shares of the commits, 0..1 to 3 decimals
 }
 export const GALLERY = 'gallery/recent.json';
+const galleryAt = (id: string) => `gallery/recent/${id}.json`;
 const GALLERY_MAX = 60;
 
 export interface Settings { hidden?: boolean; exclude?: string[]; updated?: string }
@@ -208,10 +209,41 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
   return meta;
 }
 
-async function addToGallery(m: CityMeta) {
-  const list = (await getJSON<GalleryEntry[]>(GALLERY, true)) ?? [];
-  const next = [galleryEntry(m), ...list.filter(e => e.key !== m.key)].slice(0, GALLERY_MAX);
-  await putJSON(GALLERY, next, { overwrite: true, maxAge: 60 });
+// gallery/recent.json is rewritten by every build, and the blob CDN serves an overwritten blob long past its
+// max-age: in production a copy 30 minutes stale showed vercel's earlier numbers, and a build that read it and
+// wrote it back undid the build before it (sindresorhus). So each version is also written where it is never
+// overwritten, and the rewritten blob's content type, which a head request reads from the store itself, names
+// the current one. Writes are conditional on its etag, so two builds finishing together both get in.
+async function galleryNow(): Promise<{ list: GalleryEntry[]; etag: string | null }> {
+  const st = await getStore().stat(GALLERY);
+  if (!st) return { list: [], etag: null };
+  const id = /;\s*version=([\w-]+)/.exec(st.type)?.[1];
+  return { list: (await getJSON<GalleryEntry[]>(id ? galleryAt(id) : GALLERY)) ?? [], etag: st.etag };
+}
+
+export async function readGallery(): Promise<GalleryEntry[]> {
+  return (await galleryNow()).list;
+}
+
+async function updateGallery(change: (list: GalleryEntry[]) => GalleryEntry[] | null) {
+  for (let attempt = 1; ; attempt++) {
+    const { list, etag } = await galleryNow();
+    const next = change(list);
+    if (!next) return;
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await putJSON(galleryAt(id), next);
+    try {
+      await putJSON(GALLERY, next, { maxAge: 60, type: `application/json; version=${id}`, ...(etag ? { ifMatch: etag } : { overwrite: false }) });
+      return;
+    } catch (e) {
+      if (!(e instanceof StoreConflict) || attempt >= 8) throw e;    // another build wrote first: apply this change to theirs
+      await new Promise(r => setTimeout(r, Math.random() * 100 * attempt));
+    }
+  }
+}
+
+export async function addToGallery(m: CityMeta) {
+  await updateGallery(list => [galleryEntry(m), ...list.filter(e => e.key !== m.key)].slice(0, GALLERY_MAX));
 }
 
 const share = (n: number, total: number) => (total ? Math.round((1000 * n) / total) / 1000 : 0);
@@ -224,10 +256,11 @@ export function galleryEntry(m: CityMeta): GalleryEntry {
 }
 
 export async function removeFromGallery(owner: string) {
-  const list = (await getJSON<GalleryEntry[]>(GALLERY, true)) ?? [];
   const o = owner.toLowerCase();
-  const next = list.filter(e => e.key !== o && !e.key.startsWith(o + '/'));
-  if (next.length !== list.length) await putJSON(GALLERY, next, { overwrite: true, maxAge: 60 });
+  await updateGallery(list => {
+    const next = list.filter(e => e.key !== o && !e.key.startsWith(o + '/'));
+    return next.length !== list.length ? next : null;
+  });
 }
 
 export function summarize(payload: Payload, base: Pick<CityMeta, 'v' | 'key' | 'target' | 'kind' | 'url'>): CityMeta {
