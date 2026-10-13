@@ -20,7 +20,9 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.gz': 'application/gzip', '.txt': 'text/plain; charset=utf-8',
   '.ico': 'image/x-icon', '.xml': 'application/xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.webp': 'image/webp', '.mp4': 'video/mp4' };
 
-const rewrites = config.rewrites.map(r => { const keys = []; return { re: pathToRegexp(r.source, keys), keys, dest: r.destination }; });
+const compile = rules => (rules || []).map(r => { const keys = []; return { re: pathToRegexp(r.source, keys), keys, dest: r.destination }; });
+const redirects = compile(config.redirects), rewrites = compile(config.rewrites);
+const fill = (r, m) => { let dest = r.dest; r.keys.forEach((k, i) => { dest = dest.replaceAll(`:${k.name}`, m[i + 1] ?? ''); }); return dest; };
 const headerRules = (config.headers || []).map(h => ({ re: pathToRegexp(h.source), headers: h.headers }));
 
 const loaded = new Map();
@@ -63,7 +65,11 @@ async function serve(req, res) {
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream', 'Access-Control-Allow-Origin': '*' });
     return fs.createReadStream(f).pipe(res);
   }
-  // filesystem first, as on Vercel
+  // redirects, then the filesystem, then rewrites, as on Vercel
+  for (const r of redirects) {
+    const m = r.re.exec(p);
+    if (m) { res.writeHead(307, { Location: fill(r, m) + url.search }); return res.end(); }
+  }
   const sf = staticFile(p);
   if (sf) {
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(sf)] || 'application/octet-stream', ...extra });
@@ -75,9 +81,7 @@ async function serve(req, res) {
     for (const r of rewrites) {
       const m = r.re.exec(p);
       if (!m) continue;
-      let dest = r.dest;
-      r.keys.forEach((k, i) => { dest = dest.replaceAll(`:${k.name}`, m[i + 1]); });
-      const du = new URL(dest, url);
+      const du = new URL(fill(r, m), url);
       for (const [k, v] of url.searchParams) if (!du.searchParams.has(k)) du.searchParams.set(k, v);
       url.pathname = du.pathname; url.search = du.search;
       fn = path.join(root, du.pathname + '.ts');
