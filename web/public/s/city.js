@@ -179,8 +179,9 @@
     await pool(todo, 4, async j => {
       if (expired) return;
       const t1 = Date.now();
+      let doing = 'replaying';
       set(j, 'run', 'replaying…');
-      const live = setInterval(() => set(j, 'run', `replaying… ${Math.floor((Date.now() - t1) / 1000)}s`), 1000);
+      const live = setInterval(() => set(j, 'run', `${doing}… ${Math.floor((Date.now() - t1) / 1000)}s`), 1000);
       try {
         for (let attempt = 1; ; attempt++) {
           try {
@@ -189,8 +190,12 @@
             break;
           } catch (e) {
             if (e.status === 401) { expired = e; set(j, 'bad', 'ticket expired'); break; }
-            if (e.status === 422 || e.status === 400 || attempt >= 2) { set(j, 'bad', e.message); break; }
-            await sleep(1500);
+            // busy: the builder is replaying other big repos; ask again rather than draw the city without this one
+            const busy = e.status === 503 && e.info.status === 'busy';
+            if (e.status === 422 || e.status === 400 || attempt >= (busy ? 6 : 2)) { set(j, 'bad', e.message); break; }
+            doing = busy ? 'builder busy, retrying' : 'retrying';
+            await sleep(busy ? 3000 : 1500);
+            doing = 'replaying';
           }
         }
       } finally { clearInterval(live); }

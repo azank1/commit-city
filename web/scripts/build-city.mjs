@@ -34,7 +34,10 @@ await Promise.all(Array.from({ length: Math.min(width, todo.length) }, async () 
         console.log(`  ${r.name}: ${x.cached ? 'cached' : `${x.files} files, ${x.commits} commits, ${x.mb} MB packs${x.partial ? ', partial' : ''}`} in ${secs(t1)}s`);
         break;
       } catch (e) {
-        if (e.status === 422 || e.status === 400 || e.status === 401 || attempt >= 2) { failed++; console.log(`  ${r.name}: FAILED ${e.message} (${secs(t1)}s)`); break; }
+        const busy = e.status === 503 && e.info?.status === 'busy';      // other big repos replaying: ask again
+        if (e.status === 422 || e.status === 400 || e.status === 401 || attempt >= (busy ? 6 : 2)) { failed++; console.log(`  ${r.name}: FAILED ${e.message} (${secs(t1)}s)`); break; }
+        if (busy) console.log(`  ${r.name}: ${e.message}, asking again (${secs(t1)}s)`);
+        await new Promise(res => setTimeout(res, busy ? 3000 : 1500));
       }
     }
   }

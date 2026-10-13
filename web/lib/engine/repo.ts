@@ -1,6 +1,8 @@
 // Fetch + replay one repository. Fetches are shallow and incremental: the window's commits first, then
 // whatever the shallow edge cut off that the replay still needs (the commit the window starts from, the
 // rest of a first-parent chain cut at a merge of an old branch, the parents of side-branch commits).
+import v8 from 'node:v8';
+import vm from 'node:vm';
 import { type FetchOptions, type FetchResult, fetchPack, GitError, httpTransport, type Transport } from './git.js';
 import { makeKeep } from './langs.js';
 import { ObjectDB } from './pack.js';
@@ -15,7 +17,8 @@ export interface ReplayOptions {
   transport?: Transport;        // tests inject a local upload-pack
   maxPackBytes?: number;
   timeoutMs?: number;
-  maxRssBytes?: number;         // stop with too_big past this resident size (the instance's memory is shared)
+  maxLiveBytes?: number;        // stop with too_big when the heap and buffers hold more than this after a collection
+  maxRssBytes?: number;         // stop with busy past this resident size (the instance's memory is shared)
   blobLimit?: number;           // blobs at least this big are fetched only when the replay needs them (0 = all)
   log?: (msg: string) => void;
 }
@@ -27,7 +30,23 @@ const MAX_SIDE_PARENTS = 400;
 const MAX_SIDE_ROUNDS = 12;     // merged branches inside merged branches
 const BLOB_LIMIT = 128 * 1024;
 const BLOBS_PER_FETCH = 4000;
-const MAX_RSS = 1.5e9;          // functions get 2 GB, and concurrent builds on one instance share it
+const MAX_LIVE = 1.2e9;         // heap + buffers one replay may hold: functions get 2 GB, and the allocator keeps freed pages
+const MAX_RSS = 1.9e9;          // resident size, kept pages included: past it the platform is about to kill the instance
+const MEM_EVERY_MS = 100;       // reading memory is a syscall, and the guard runs every 1024 objects and every commit
+const GC_EVERY_MS = 2000;      // two full collections are not free: at most one pair per two seconds
+
+// V8's collector, which Node hides unless started with --expose-gc; a context made after the flag is set has it.
+// Twice: buffers the first pass frees still count as external memory until the next one settles the sweep.
+let gc: (() => void) | null | undefined;
+function collectGarbage() {
+  if (gc === undefined) {
+    try {
+      gc = typeof globalThis.gc === 'function' ? globalThis.gc : (v8.setFlagsFromString('--expose-gc'), vm.runInNewContext('gc') as () => void);
+    } catch { gc = null; }
+  }
+  gc?.();
+  gc?.();
+}
 
 export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord; stats: ReplayStats }> {
   const t0 = Date.now();
@@ -38,10 +57,25 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
   // Indexing a pack and replaying it are synchronous and can run for minutes on a big repo, so the deadline
   // is checked inside them too, not only between fetches: past it, the platform kills the function at 300 s
   // (or the instance runs out of memory) and the visitor gets a bare 500 after a five-minute wait.
-  const maxRss = o.maxRssBytes ?? MAX_RSS;
+  // Memory is judged by what is live, not what is resident: RSS keeps the pages the allocator freed but did not
+  // return, so a warm instance that had replayed one big repo stayed "full" and failed every replay after it
+  // (vercel/bridge, a 1 MB repo, in 0.5 s). Garbage counts as live until V8 collects it, and V8 collects lazily
+  // while memory is plentiful, so the guard collects before it believes a number over the limit.
+  const maxLive = o.maxLiveBytes ?? MAX_LIVE, maxRss = o.maxRssBytes ?? MAX_RSS;
+  let memAt = 0, gcAt = 0;
   const guard = () => {
-    if (Date.now() > deadline) throw new GitError('replay ran out of time', 'timeout');
-    if (process.memoryUsage.rss() > maxRss) throw new GitError('replay needs more memory than the hosted builder has', 'too_big');
+    const now = Date.now();
+    if (now > deadline) throw new GitError('replay ran out of time', 'timeout');
+    if (now - memAt < MEM_EVERY_MS) return;
+    memAt = now;
+    let m = process.memoryUsage();
+    if (m.heapUsed + m.external <= maxLive && m.rss <= maxRss) return;
+    if (now - gcAt < GC_EVERY_MS) return;              // collected a moment ago: what is over now is new garbage
+    gcAt = now;
+    collectGarbage();
+    m = process.memoryUsage();
+    if (m.heapUsed + m.external > maxLive) throw new GitError('replay needs more memory than the hosted builder has', 'too_big');
+    if (m.rss > maxRss) throw new GitError('the hosted builder is short of memory right now', 'busy');
   };
   db.guard = guard;
   const shallow = new Set<string>();
@@ -59,7 +93,7 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
     try {
       r = await fetchPack(tr, { ...f, shallow: [...shallow], maxBytes: budget, timeoutMs: left, filter: unfiltered ? undefined : filter });
     } catch (e) {
-      if (!f.haves?.length || !(e instanceof GitError) || e.code === 'empty' || e.code === 'too_big' || e.code === 'timeout') throw e;
+      if (!f.haves?.length || !(e instanceof GitError) || e.code === 'empty' || e.code === 'too_big' || e.code === 'timeout' || e.code === 'busy') throw e;
       fetches++;                                    // negotiation trouble: ask again without haves
       r = await fetchPack(tr, { ...f, haves: [], shallow: [...shallow], maxBytes: budget, timeoutMs: deadline - Date.now(), filter: unfiltered ? undefined : filter });
     }
@@ -68,7 +102,10 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
     for (const s of r.unshallow) shallow.delete(s);
     const wants = Array.isArray(f.want) ? f.want.length : 1;
     const how = f.deepenSince != null ? 'since' : f.deepen != null ? `depth ${f.deepen}` : 'full';
-    o.log?.(`${o.repo}: fetch ${fetches} (${wants} want, ${how}, ${f.haves?.length ?? 0} have) ${(r.pack.length / 1e6).toFixed(1)} MB in ${Date.now() - t} ms`);
+    if (o.log) {
+      const m = process.memoryUsage();
+      o.log(`${o.repo}: fetch ${fetches} (${wants} want, ${how}, ${f.haves?.length ?? 0} have) ${(r.pack.length / 1e6).toFixed(1)} MB in ${Date.now() - t} ms; live ${((m.heapUsed + m.external) / 1e6).toFixed(0)} MB, rss ${(m.rss / 1e6).toFixed(0)} MB`);
+    }
     return r;
   };
 
@@ -133,6 +170,7 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
       try {
         await get({ want: batch, deepen: 1, haves: [o.head] });
       } catch (e) {
+        if (e instanceof GitError && e.code === 'busy') throw e;
         o.log?.(`${o.repo}: merged-branch tips unavailable (${(e as Error).message})`);
         break;
       }
@@ -156,6 +194,7 @@ export async function replayRepo(o: ReplayOptions): Promise<{ record: RepoRecord
     try {
       await get({ want: [...lost], deepen: 1, haves: [o.head] });
     } catch (e) {
+      if (e instanceof GitError && e.code === 'busy') throw e;   // a memory squeeze is retried, not drawn as commits without files
       o.log?.(`${o.repo}: side-branch parents unavailable (${(e as Error).message})`);
     }
   }

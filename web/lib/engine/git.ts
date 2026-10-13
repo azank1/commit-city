@@ -7,7 +7,7 @@ export interface Transport {
 }
 
 export class GitError extends Error {
-  constructor(message: string, readonly code: 'not_found' | 'too_big' | 'timeout' | 'protocol' | 'empty' | 'http') {
+  constructor(message: string, readonly code: 'not_found' | 'too_big' | 'timeout' | 'protocol' | 'empty' | 'http' | 'busy') {
     super(message);
   }
 }

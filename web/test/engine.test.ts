@@ -238,7 +238,27 @@ test('a branch merged into a main that was quiet before the window keeps all its
 test('a replay that outgrows its memory stops with too_big instead of taking the instance down', async () => {
   const root = tmpdir();
   const r = scenario(path.join(root, 'repo'));
-  // any real process is over 1 byte: the guard inside the replay loop must fire after the fetch succeeded
-  await assert.rejects(replayRepo({ repo: 'test/repo', head: r.head(), start: 0, transport: localTransport(r.bare()), maxRssBytes: 1 }),
+  // any real process holds over 1 byte, even after a collection: the guard inside the replay loop must fire after the fetch succeeded
+  await assert.rejects(replayRepo({ repo: 'test/repo', head: r.head(), start: 0, transport: localTransport(r.bare()), maxLiveBytes: 1 }),
     (e: unknown) => e instanceof GitError && e.code === 'too_big' && /memory/.test(e.message));
+});
+
+test('a full instance makes a replay busy, to be asked again, not too big', async () => {
+  const root = tmpdir();
+  const r = scenario(path.join(root, 'repo'));
+  await assert.rejects(replayRepo({ repo: 'test/repo', head: r.head(), start: 0, transport: localTransport(r.bare()), maxRssBytes: 1 }),
+    (e: unknown) => e instanceof GitError && e.code === 'busy');
+});
+
+test('memory freed but kept by the allocator does not fail the next replay', async () => {
+  const root = tmpdir();
+  const r = scenario(path.join(root, 'repo'));
+  // garbage another replay left: resident, and live until collected. Read without a collection, it failed this replay
+  let junk: Buffer[] | null = Array.from({ length: 40 }, () => Buffer.alloc(4e6, 1));
+  const rss = process.memoryUsage.rss(), live = (() => { const m = process.memoryUsage(); return m.heapUsed + m.external; })();
+  junk = null;
+  const { record } = await replayRepo({ repo: 'test/repo', head: r.head(), start: 0, transport: localTransport(r.bare()),
+    maxLiveBytes: live - 100e6, maxRssBytes: rss + 1e9 });
+  assert.ok(record.commits.length > 0);
+  assert.equal(junk, null);
 });

@@ -9,6 +9,7 @@ import { sign, verify } from './secret.js';
 import { type Sky, skyline } from './skyline.js';
 import { getJSON, getStore, putJSON } from './store.js';
 import { cityKey } from './target.js';
+import { Turns } from './turns.js';
 
 // the record version is part of the key, so records of an older shape are cache misses and get replayed again.
 // So is the replay generation: bump REPLAY_GEN when the hosted replay is fixed to fetch commits it used to miss.
@@ -59,7 +60,7 @@ const GALLERY_MAX = 60;
 
 export interface Settings { hidden?: boolean; exclude?: string[]; updated?: string }
 
-interface Ticket { k: string; t: string; s: number; w: boolean; r: [string, string, number][] }
+interface Ticket { k: string; t: string; s: number; w: boolean; r: [string, string, number, number?][] }   // r: name, head, head time, disk KB
 interface Plan {
   k: string; kind: Discovery['kind']; mode: Discovery['mode']; s: number; n: number;
   p: Discovery['profile']; c: number | null; x: number; o: [number, number];
@@ -137,7 +138,7 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
   }
   const named = big.filter(s => !excluded.has(s.name.toLowerCase())).sort((a, b) => b.commits - a.commits).slice(0, 3);
   const gens = await Promise.all(repos.map(r => usableGen(r.name, r.head, r.headTime, whole)));
-  const ticket: Ticket = { k: key, t: d.target, s: whole ? 0 : Math.min(d.start, replayStart(d.now)), w: whole, r: repos.map(r => [r.name, r.head, r.headTime]) };
+  const ticket: Ticket = { k: key, t: d.target, s: whole ? 0 : Math.min(d.start, replayStart(d.now)), w: whole, r: repos.map(r => [r.name, r.head, r.headTime, r.diskKB]) };
   const plan: Plan = {
     k: key, kind: d.kind, mode: d.mode, s: d.start, n: d.now, p: d.profile, c: d.contributions, x: d.restricted,
     o: [d.omittedRepos, d.omittedCommits], ...(named.length ? { b: named.map(s => [s.name, s.commits] as [string, number]) } : {}),
@@ -153,28 +154,45 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
   };
 }
 
+// Fluid compute runs concurrent requests in one process, 2 GB between them. Big replays side by side can outgrow
+// that together though each fits alone (every client sends a city's biggest repos first, four at a time), so
+// they take turns; small repos, most of any city, never wait. A request that waits too long is told the builder
+// is busy, and the page asks again.
+const HEAVY_KB = 16 * 1024;
+const TURN_WAIT_MS = 150_000;      // the function has 300 s: this leaves a replay that waited the whole time 130
+const heavy = new Turns();
+
 export async function buildRepo(ticketToken: string, name: string) {
+  const t0 = Date.now();
   const t = verify<Ticket>(ticketToken);
   if (!t) throw new HttpError(401, 'build ticket expired; reload the page');
   const entry = t.r.find(r => r[0] === name);
   if (!entry) throw new HttpError(400, 'repository is not part of this build');
-  const [repo, head, headTime] = entry;
+  const [repo, head, headTime, kb] = entry;
   const path = repoPath(repo, head, t.w);
   if (await exists(path)) return { cached: true };
+  const big = kb === undefined || kb >= HEAVY_KB;      // a ticket from before sizes were kept counts every repo as big
+  if (big && !(await heavy.take(TURN_WAIT_MS))) throw new HttpError(503, 'the builder is busy with other big repos', { status: 'busy' });
   try {
+    if (big && Date.now() - t0 > 2000 && await exists(path)) return { cached: true };   // replayed for another build meanwhile
     const { record, stats } = await replayRepo({
-      repo, head, headTime, start: t.s, timeoutMs: 240_000, maxPackBytes: 400e6,
+      repo, head, headTime, start: t.s, timeoutMs: Math.min(240_000, 280_000 - (Date.now() - t0)), maxPackBytes: 400e6,
       token: process.env.GITHUB_TOKEN, log: m => console.log(m),
     });
     await putJSON(path, record, { overwrite: true });
     return { cached: false, files: record.files.length, commits: record.commits.length, ms: stats.ms, mb: Math.round(stats.packBytes / 1e5) / 10, partial: record.partial };
   } catch (e) {
     if (e instanceof GitError) {
+      const m = process.memoryUsage();
+      console.log(`${repo}: ${e.code}: ${e.message}; live ${((m.heapUsed + m.external) / 1e6).toFixed(0)} MB, rss ${(m.rss / 1e6).toFixed(0)} MB, ${heavy.waiting} waiting`);
+      if (e.code === 'busy') throw new HttpError(503, 'the builder is short of memory right now', { status: 'busy' });
       const reason = e.code === 'too_big' ? 'too big for the hosted builder' : e.code === 'timeout' ? 'took too long to replay'
         : e.code === 'not_found' ? 'not readable' : `fetch failed (${e.message.slice(0, 120)})`;
       throw new HttpError(422, reason, { status: 'repo_failed' });
     }
     throw e;
+  } finally {
+    if (big) heavy.done();
   }
 }
 
