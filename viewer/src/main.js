@@ -948,7 +948,18 @@ const el = {
   } else if (tot.contributions != null) {
     bits.push(`GitHub shows ${fmtInt(tot.contributions)} contributions since ${tot.window_start}; it also counts PRs, issues, reviews and private activity. Buildings show default-branch commits.`);
   } else if (!PERSONAL) {
-    bits.push(`Buildings show every non-merge commit on ${DATA.kind === 'org' ? "each repo's" : 'the'} default branch since ${tot.window_start}.`);
+    const org = DATA.kind === 'org', ld = tot.landed;
+    if (ld && ld.commits >= (tot.commits || 0) + (ld.merges || 0)) {
+      // GitHub's count = the buildings + merges + commits written before the window start, exactly (bundle.ts)
+      const earlier = ld.commits - (tot.commits || 0) - (ld.merges || 0);
+      const where = org ? `the default branches of these ${DATA.repos.length} repos` : 'the default branch';
+      const left = [...(ld.merges ? [`${fmtInt(ld.merges)} ${ld.merges === 1 ? 'merge' : 'merges'}`] : []),
+        ...(earlier ? [`${fmtInt(earlier)} ${earlier === 1 ? 'commit' : 'commits'} written before ${tot.window_start}`] : [])];
+      bits.push(`GitHub counts ${fmtInt(ld.commits)} commits on ${where} since ${tot.window_start}, by the day each landed. `
+        + (left.length ? `Buildings show the ${fmtInt(tot.commits || 0)} written since then. Not drawn: ${list(left)}.` : 'Buildings show all of them.'));
+    } else {
+      bits.push(`Buildings show every non-merge commit written since ${tot.window_start} on ${org ? "each repo's" : 'the'} default branch.`);
+    }
   }
   if (rest > 0) bits.push(`${rest} ${big.length ? 'more ' : ''}${rest === 1 ? 'repo' : 'repos'} (${fmtInt(restCommits)} commits) not drawn: the very largest are skipped, and only the busiest are shown.`);
   // what is left of GitHub's count: commits it credits to co-authors, commits once pushed to a default branch and

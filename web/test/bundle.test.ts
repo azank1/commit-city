@@ -92,6 +92,34 @@ test('bundle matches python (aggregation, budgets, epoch, timezone)', async () =
   assert.ok(ts.repos.every(r => r.m.every(m => m.length === 3 || (m.length === 4 && m[3] > 0))), 'human rows stay 3 long');
 });
 
+test("GitHub's count for a repo city: the buildings, the merges, and commits written before the window", async () => {
+  const r = makeRepo(path.join(tmpdir(), 'landed'), 1);
+  const start = T0 + 2 * DAY;
+  const { record } = await replayRepo({ repo: 'me/alpha', head: r.head(), start, transport: localTransport(r.bare()) });
+  // GitHub dates a commit by when it landed; the city by when it was written. Make one commit a merge and one
+  // written before the window (and landed in it), as in golang/go: 3,748 on GitHub, 3,491 drawn, 32 merges, 225 earlier
+  const commits = record.commits.map(c => [...c] as typeof c);
+  commits[0][3] = 1;
+  commits[1][1] = Math.floor(start / 60) - 7 * 1440;
+  const rec = { ...record, commits };
+  const mine = mineOf(rec, { since: start });
+  assert.equal(mine.length, commits.length - 2);
+  const input = (landed: number | undefined, recd = rec) => ({
+    login: 'me/alpha', kind: 'repo' as const, name: 'me/alpha', avatar: '', url: '', now: T0 + 30 * DAY, start, contributions: null, restricted: 0,
+    repos: [{ name: 'me/alpha', fork: false, record: recd, mine, ...(landed === undefined ? {} : { landed }) }],
+  });
+  const p = bundle(input(commits.length));
+  assert.equal(p.totals.commits, commits.length - 2);
+  assert.deepEqual(p.totals.landed, { commits: commits.length, merges: 1 });   // written earlier: the remaining 1
+  // no split where it would not add up: no count from GitHub, a count below the buildings and merges, a record
+  // that is approximate or cut at its commit cap
+  assert.equal(bundle(input(undefined)).totals.landed, undefined);
+  assert.equal(bundle(input(commits.length - 2)).totals.landed, undefined);
+  assert.equal(bundle(input(commits.length, { ...rec, partial: 'window start state unavailable' })).totals.landed, undefined);
+  const cut = { ...rec, commits: [...commits, ...Array.from({ length: 20_000 - commits.length }, () => commits[2])] };
+  assert.equal(bundle(input(20_000, cut)).totals.landed, undefined);
+});
+
 test('aggregate helpers match the python rules', () => {
   assert.deepEqual(mergeEvents([[1, 5, 3, 0], [2, 7]]), [1, 5, 2, 12, 3, 7]);
   assert.deepEqual(budgetCaps([10, 50, 3], 40, 30), [10, 17, 3]);
@@ -149,6 +177,7 @@ test('finish step: records of another version are never drawn; meta and gallery 
   assert.deepEqual([payload.totals.omitted_repos, payload.totals.omitted_commits], [2, 905]);
   assert.deepEqual(payload.totals.too_big, [{ repo: 'me/huge', commits: 900 }]);
   assert.deepEqual(payload.totals.github, { commits: 950 });            // GitHub's count rides along; capped only when true
+  assert.deepEqual(payload.totals.landed, { commits: 7, merges: 0 });   // and, for an org, its history count of the drawn repos
   assert.equal((await getJSON<{ v: number }>('meta/old-me.json'))?.v, meta.v);   // the name the build was asked for points here
 });
 
