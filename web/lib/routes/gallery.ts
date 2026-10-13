@@ -2,17 +2,21 @@
 import { type GalleryEntry, readGallery, readMeta } from '../city.js';
 import { handle, json } from '../http.js';
 
-const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'facebook/react', 'denoland/deno', 'gaearon', 'karpathy', 'rust-lang/rust', 'withastro', 'antfu'];
+const FEATURED = ['torvalds', 'sindresorhus', 'vercel', 'react/react', 'denoland/deno', 'gaearon', 'karpathy', 'rust-lang/rust', 'withastro', 'antfu'];
+
+// a city built under a repo's old name (facebook/react, now react/react) is a second city of the same repo: the
+// list shows the one under the name GitHub uses now
+const current = (e: GalleryEntry) => e.key === e.target.toLowerCase() + (e.key.endsWith('@all') ? '@all' : '');
 
 export const GET = handle(async () => {
-  const recent = await readGallery().catch(() => [] as GalleryEntry[]);
+  const recent = (await readGallery().catch(() => [] as GalleryEntry[])).filter(current);
   // a featured city built lately takes its entry from the list, so both lists show the same build; its meta otherwise
   const latest = new Map(recent.map(e => [e.key, e]));
   const metas = await Promise.all(FEATURED.map(k => (latest.has(k) ? null : readMeta(k).catch(() => null))));
   const featured: GalleryEntry[] = FEATURED.flatMap((k, i) => {
     const e = latest.get(k), m = metas[i];
     if (e) return [e];
-    if (!m) return [];
+    if (!m || m.key !== m.target.toLowerCase()) return [];
     return [{
       key: m.key, target: m.target, kind: m.kind, avatar: m.avatar, commits: m.commits, repos: m.repos, lines: m.lines, v: m.v,
       // commit shares as galleryEntry() in city.ts writes them; metas built before the agent lens have no `who`
