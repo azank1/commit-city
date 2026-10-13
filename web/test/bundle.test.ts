@@ -128,7 +128,7 @@ test('finish step: records of another version are never drawn; meta and gallery 
   const ticket = sign({ k: 'me', t: 'me', s: start, w: false, r: [['me/alpha', r.head(), 0], ['me/beta', 'b'.repeat(40), 0]] }, 600);
   const plan = sign({
     k: 'me', kind: 'org', mode: 'all', s: start, n: T0 + 30 * DAY, p: { login: 'me', name: 'Me', avatar: '', url: '', createdAt: '' },
-    c: null, x: 0, o: [1, 900], b: [['me/huge', 900]], g: { commits: 950, capped: false },
+    c: null, x: 0, o: [1, 900], b: [['me/huge', 900]], g: { commits: 950, capped: false }, a: 'old-me',
     r: [{ n: 'me/alpha', f: false, c: 7, h: r.head() }, { n: 'me/beta', f: false, c: 5, h: 'b'.repeat(40) }],
   }, 600);
   const meta = await finishBuild(ticket, plan);
@@ -143,6 +143,7 @@ test('finish step: records of another version are never drawn; meta and gallery 
   assert.deepEqual([payload.totals.omitted_repos, payload.totals.omitted_commits], [2, 905]);
   assert.deepEqual(payload.totals.too_big, [{ repo: 'me/huge', commits: 900 }]);
   assert.deepEqual(payload.totals.github, { commits: 950 });            // GitHub's count rides along; capped only when true
+  assert.equal((await getJSON<{ v: number }>('meta/old-me.json'))?.v, meta.v);   // the name the build was asked for points here
 });
 
 test('a generation-1 record stays in use only where the merged-branch fix cannot change it', async () => {

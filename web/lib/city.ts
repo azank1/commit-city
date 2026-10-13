@@ -65,6 +65,7 @@ interface Plan {
   p: Discovery['profile']; c: number | null; x: number; o: [number, number];
   b?: [string, number][];       // the biggest repos skipped as too big to replay (counted in o), named on the city page
   g?: Discovery['github'];      // a person's public commits as GitHub counts them, for the city's reconciliation note
+  a?: string;                   // the key this build was asked for, when GitHub has moved the repo since: its page redirects
   r: { n: string; f: boolean; c: number; h: string; sh?: string[]; gen?: number }[];   // gen: an older record still in use
 }
 
@@ -115,9 +116,9 @@ export async function usableGen(name: string, head: string, headTime: number, wh
 
 export async function startBuild(target: Target, token: string, opts: { whole?: boolean } = {}) {
   const whole = !!opts.whole && target.kind === 'repo';
-  const key = cityKey(target, whole);
+  let key = cityKey(target, whole);
   const owner = target.kind === 'owner' ? target.login : target.owner;
-  const settings = await readSettings(owner, true);
+  let settings = await readSettings(owner, true);
   if (settings.hidden) throw new HttpError(403, 'this city is hidden by its owner', { status: 'hidden' });
   let d: Discovery;
   try {
@@ -126,6 +127,16 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
     if (e instanceof NotFound) throw new HttpError(404, e.message, { status: 'not_found' });
     if (e instanceof RateLimited) throw new HttpError(503, 'GitHub API quota is used up for now; sign in with GitHub to build with your own quota', { status: 'rate_limited', resetAt: e.resetAt });
     throw e;
+  }
+  // a repo GitHub moved (facebook/react is react/react now) is built under its current name, so there is one city
+  // per repo; finish() leaves the old name a meta that redirects there. Whoever owns the repo now may hide it.
+  let alias: string | undefined;
+  if (target.kind === 'repo' && d.target.toLowerCase() !== cityKey(target)) {
+    const [movedOwner, movedName] = d.target.split('/');
+    alias = key;
+    key = cityKey({ kind: 'repo', owner: movedOwner, name: movedName }, whole);
+    settings = await readSettings(movedOwner, true);
+    if (settings.hidden) throw new HttpError(403, 'this city is hidden by its owner', { status: 'hidden' });
   }
   const excluded = new Set((settings.exclude ?? []).map(s => s.toLowerCase()));
   const repos = d.repos.filter(r => !excluded.has(r.name.toLowerCase()));
@@ -141,7 +152,7 @@ export async function startBuild(target: Target, token: string, opts: { whole?: 
   const plan: Plan = {
     k: key, kind: d.kind, mode: d.mode, s: d.start, n: d.now, p: d.profile, c: d.contributions, x: d.restricted,
     o: [d.omittedRepos, d.omittedCommits], ...(named.length ? { b: named.map(s => [s.name, s.commits] as [string, number]) } : {}),
-    ...(d.github ? { g: d.github } : {}),
+    ...(d.github ? { g: d.github } : {}), ...(alias ? { a: alias } : {}),
     r: repos.map((r, i) => ({ n: r.name, f: r.fork, c: r.commits, h: r.head, ...(r.shas ? { sh: r.shas } : {}),
       ...(gens[i] && gens[i] !== REPLAY_GEN ? { gen: gens[i] } : {}) })),
   };
@@ -204,6 +215,7 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
   const meta = summarize(payload, { v, key: p.k, target: t.t, kind: p.kind, url });
   await putJSON(skyPath(p.k, v), skyline(payload)).catch(e => console.error('sky', e));
   await putJSON(metaPath(p.k), meta, { overwrite: true, maxAge: 60 });
+  if (p.a) await putJSON(metaPath(p.a), meta, { overwrite: true, maxAge: 60 }).catch(e => console.error('moved', e));
   await addToGallery(meta).catch(e => console.error('gallery', e));
   return meta;
 }

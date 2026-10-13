@@ -144,6 +144,10 @@
     try {
       st = await call('/api/build/start', { t: CC.target, all: !!CC.all });
     } catch (e) { return fail(e); }
+    // GitHub moved this repo: the city is built, and lives, under its current name
+    if (isRepo && st.target.toLowerCase() !== CC.target.toLowerCase() && history.replaceState) {
+      history.replaceState(null, '', `/${st.target}${CC.all ? '?all=1' : ''}${location.hash}`);
+    }
     const who = st.kind === 'org' ? `the ${st.profile.login} org` : st.kind === 'repo' ? st.target : st.profile.name || st.profile.login;
     const jobs = st.repos.map(r => ({ ...r, s: r.cached ? 'hit' : 'wait', note: r.cached ? 'cached' : `${fmt(r.commits)} commits` }));
     for (const s of st.skipped || []) jobs.push({ name: s.name, s: 'bad', note: s.reason, skipped: true, commits: s.commits });
