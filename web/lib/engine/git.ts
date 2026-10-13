@@ -97,66 +97,105 @@ export async function fetchPack(t: Transport, o: FetchOptions): Promise<FetchRes
   }
 }
 
+// Pack bytes are copied out of each network chunk as it arrives, into blocks joined once at the end. The chunks
+// themselves were kept before: tens of thousands of 16-64 KB allocations among ones that live on, a heap glibc could
+// not give back once the pack was freed. Replayed from the same recorded responses, google/site-kit-wp, google/dawn
+// and anomalyco/opencode left 436, 467 and 480 MB resident after a last-resort collection; 364, 371 and 372 MB with
+// blocks. Blocks double from 64 KB to 64 MB: glibc maps anything over 32 MB on its own and unmaps it when freed.
+const FIRST_BLOCK = 64 * 1024;
+const MAX_BLOCK = 64 * 1024 * 1024;
+
 async function readResponse(body: AsyncIterable<Uint8Array>, o: FetchOptions, ac: AbortController): Promise<FetchResult> {
   const shallow: string[] = [], unshallow: string[] = [];
-  const packChunks: Buffer[] = [];
+  const blocks: Buffer[] = [];
+  let block = Buffer.alloc(0), used = 0;
   let packBytes = 0;
   let section = '';
-  let pending: Buffer = Buffer.alloc(0);
   let done = false;
   const maxBytes = o.maxBytes ?? Infinity;
+  // the pkt-line being read: its 4-digit length (which can be split between chunks), the payload bytes still to
+  // come, a packfile line's side band once its first byte is in, and the pieces of a text line
+  const head = Buffer.alloc(4);
+  let headLen = 0, left = 0, band = -1;
+  let text: Buffer[] = [];
 
-  const handle = (payload: Buffer | null, special: number) => {
-    if (payload === null) {                                  // 0000 flush, 0001 delim, 0002 response end
-      if (special === 1) section = '';
-      else done = true;
-      return;
+  const keep = (data: Buffer) => {
+    packBytes += data.length;
+    if (packBytes > maxBytes) {
+      ac.abort();
+      throw new GitError(`pack exceeds ${Math.round(maxBytes / 1e6)} MB`, 'too_big');
     }
-    if (section === 'packfile') {
-      const band = payload[0];
-      if (band === 1) {
-        packBytes += payload.length - 1;
-        if (packBytes > maxBytes) {
-          ac.abort();
-          throw new GitError(`pack exceeds ${Math.round(maxBytes / 1e6)} MB`, 'too_big');
-        }
-        packChunks.push(payload.subarray(1));
-        o.onProgress?.(packBytes);
-      } else if (band === 3) {
-        throw new GitError(`remote error: ${payload.subarray(1).toString('utf8').trim()}`, 'protocol');
+    for (let i = 0; i < data.length;) {
+      if (used === block.length) {
+        if (used) blocks.push(block);
+        block = Buffer.allocUnsafeSlow(Math.min(MAX_BLOCK, Math.max(FIRST_BLOCK, block.length * 2)));
+        used = 0;
       }
-      return;
+      const n = data.copy(block, used, i);
+      used += n;
+      i += n;
     }
-    const line = payload.toString('utf8').replace(/\n$/, '');
-    if (line.startsWith('ERR ')) {
-      const msg = line.slice(4);
+    o.onProgress?.(packBytes);
+  };
+
+  const line = (payload: Buffer) => {
+    const l = payload.toString('utf8').replace(/\n$/, '');
+    if (l.startsWith('ERR ')) {
+      const msg = l.slice(4);
       throw new GitError(`remote error: ${msg}`, /no commits selected|not our ref|not found/i.test(msg) ? 'empty' : 'protocol');
     }
-    if (!section) { section = line; return; }
+    if (!section) { section = l; return; }
     if (section === 'shallow-info') {
-      if (line.startsWith('shallow ')) shallow.push(line.slice(8));
-      else if (line.startsWith('unshallow ')) unshallow.push(line.slice(10));
+      if (l.startsWith('shallow ')) shallow.push(l.slice(8));
+      else if (l.startsWith('unshallow ')) unshallow.push(l.slice(10));
     }
     // acknowledgments / wanted-refs / packfile-uris: nothing to do with `done` sent
   };
 
   for await (const chunk of body) {
-    pending = pending.length ? Buffer.concat([pending, Buffer.from(chunk)]) : Buffer.from(chunk);
+    const buf = Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
     let p = 0;
-    while (!done && pending.length - p >= 4) {
-      const len = parseInt(pending.toString('latin1', p, p + 4), 16);
-      if (Number.isNaN(len)) throw new GitError('malformed pkt-line', 'protocol');
-      if (len < 4) { handle(null, len); p += 4; continue; }
-      if (pending.length - p < len) break;
-      handle(pending.subarray(p + 4, p + len), -1);
-      p += len;
+    while (p < buf.length && !done) {
+      if (!left) {
+        const n = buf.copy(head, headLen, p, Math.min(buf.length, p + 4 - headLen));
+        p += n;
+        headLen += n;
+        if (headLen < 4) break;
+        headLen = 0;
+        const len = parseInt(head.toString('latin1'), 16);
+        if (Number.isNaN(len)) throw new GitError('malformed pkt-line', 'protocol');
+        if (len < 4) {                                       // 0000 flush, 0001 delim, 0002 response end
+          if (len === 1) section = '';
+          else done = true;
+        } else {
+          left = len - 4;
+          band = -1;
+          if (!left && section !== 'packfile') line(Buffer.alloc(0));
+        }
+        continue;
+      }
+      const n = Math.min(left, buf.length - p);
+      let part = buf.subarray(p, p + n);
+      p += n;
+      left -= n;
+      if (section !== 'packfile') {
+        text.push(Buffer.from(part));
+        if (!left) { line(Buffer.concat(text)); text = []; }
+        continue;
+      }
+      if (band === -1) { band = part[0]; part = part.subarray(1); }
+      if (band === 1) { if (part.length) keep(part); }
+      else if (band === 3) {
+        text.push(Buffer.from(part));
+        if (!left) throw new GitError(`remote error: ${Buffer.concat(text).toString('utf8').trim()}`, 'protocol');
+      }
     }
-    pending = p < pending.length ? pending.subarray(p) : Buffer.alloc(0);
     if (done) break;
   }
-  if (!packChunks.length && section !== 'packfile') {
+  if (!packBytes && section !== 'packfile') {
     // git answers a deepen-since that selects no commits by ending the stream after shallow-info
     throw new GitError(`no packfile in response (last section: ${section || 'none'})`, o.deepenSince != null ? 'empty' : 'protocol');
   }
-  return { pack: Buffer.concat(packChunks, packBytes), shallow, unshallow };
+  blocks.push(block.subarray(0, used));
+  return { pack: Buffer.concat(blocks, packBytes), shallow, unshallow };
 }
