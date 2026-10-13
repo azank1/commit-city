@@ -216,6 +216,7 @@ export async function finishBuild(ticketToken: string, planToken: string): Promi
   const repos = p.r.map((r, i) => ({ r, rec: records[i] })).filter(x => x.rec).map(({ r, rec }) => ({
     name: r.n, fork: r.f, record: rec!,
     mine: p.mode === 'mine' ? mineOf(rec!, { shas: new Set(r.sh ?? []) }) : mineOf(rec!, { since: p.s }),
+    ...(p.mode === 'all' ? { landed: r.c } : {}),     // discovery's history(since) count: GitHub's, by landing day
   }));
   const missing = p.r.filter((_, i) => !records[i]);
   let payload: Payload;

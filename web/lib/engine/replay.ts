@@ -7,7 +7,7 @@ import { type Commit, type ObjectDB, type TreeEntry, parseTree } from './pack.js
 
 export const BINARY_SIZE = 12;          // a binary file stands in as a 12-line file
 export const RECORD_VERSION = 2;        // bump when records change shape: cached records of another version are misses
-const MAX_COMMITS = 20000;              // per-repo cap on recorded commit touch lists
+export const MAX_COMMITS = 20000;       // per-repo cap on recorded commit touch lists (the newest by author time)
 const MAX_TOUCH = 300;
 
 /** [sha12, author minute, author UTC offset, is merge (0|1), files touched, first 300 file indexes, who] where who

@@ -1,7 +1,7 @@
 // Turn replayed repo records into the viewer payload (schema 1). The TypeScript twin of
 // commit_city/bundle.py: same ranking, aggregation, budgets, timezone and epoch rules.
 import { LANG_CLASSES } from './langs.js';
-import type { RepoRecord } from './replay.js';
+import { MAX_COMMITS, type RepoRecord } from './replay.js';
 
 export const SCHEMA_VERSION = 1;
 export const GENERATOR = 'commit.city 0.2.0';
@@ -11,7 +11,10 @@ type Mine = [number, number, number, number[], string, string];   // [author min
 /** A commit row: [t, n files, file idx], plus w (index into Payload.who, >= 1) when not by a human. */
 export type MineRow = [number, number, number[]] | [number, number, number[], number];
 
-export interface BundleRepo { name: string; fork: boolean; record: RepoRecord; mine: Mine[] }
+export interface BundleRepo {
+  name: string; fork: boolean; record: RepoRecord; mine: Mine[];
+  landed?: number;                  // GitHub's count of default-branch commits that landed since the window start (repo and org cities)
+}
 
 export interface BundleInput {
   login: string;                    // shown in the HUD: a user, an org, or owner/repo
@@ -47,6 +50,9 @@ export interface Payload {
     commits: number; contributions: number | null; restricted: number; window_start: string; omitted_repos: number; omitted_commits: number;
     too_big?: { repo: string; commits: number }[];
     github?: { commits: number; capped?: true };
+    // GitHub's count for the drawn repos, by the day each commit landed, and the merges in it: the rest of it
+    // beyond the buildings is commits written before the window start
+    landed?: { commits: number; merges: number };
   };
   repos: { n: string; fork: boolean; anon: boolean; fp: number; agg: number; p: string[]; l: number[]; e: number[][]; m: MineRow[] }[];
 }
@@ -189,6 +195,14 @@ export function bundle(inp: BundleInput): Payload {
   const caps = budgetCaps(records.map(r => r.record.files.length), inp.maxFilesPerRepo ?? 2500, inp.maxFilesTotal ?? 60000);
   const who = actors(records);
   const widx = new Map(who.map((k, i) => [k, i]));
+  // GitHub counts a repo's commits by the day they landed, merges included; the buildings are the non-merge commits
+  // written since the window start. Drawn + merges + written earlier = GitHub's count, exactly when every record is
+  // whole (not approximate, not cut at MAX_COMMITS), so the split is given only then, and only if GitHub's count is
+  // not below the other two
+  const drawn = records.reduce((a, r) => a + r.mine.length, 0);
+  const merges = records.reduce((a, r) => a + r.record.commits.filter(c => c[3] === 1 && c[1] * 60 >= inp.start).length, 0);
+  const landed = records.every(r => r.landed != null) && !records.some(r => r.record.partial || r.record.commits.length >= MAX_COMMITS)
+    ? records.reduce((a, r) => a + r.landed!, 0) : null;
   const repos = records.map((r, k) => {
     const [files, remap] = aggregate(r.record.files, caps[k]);
     const m = r.mine.map(([t, , , idx, , w]): MineRow => {
@@ -215,7 +229,7 @@ export function bundle(inp: BundleInput): Payload {
     langs: LANG_CLASSES,
     who,
     totals: {
-      commits: repos.reduce((a, r) => a + r.m.length, 0),
+      commits: drawn,
       contributions: inp.contributions,
       restricted: inp.restricted,
       window_start: isoDay(inp.start),
@@ -223,6 +237,7 @@ export function bundle(inp: BundleInput): Payload {
       omitted_commits: omitted.reduce((a, r) => a + r.mine.length, 0) + (inp.omittedCommits ?? 0),
       ...(inp.tooBig?.length ? { too_big: inp.tooBig.map(([repo, commits]) => ({ repo, commits })) } : {}),
       ...(inp.github ? { github: inp.github.capped ? { commits: inp.github.commits, capped: true } : { commits: inp.github.commits } } : {}),
+      ...(landed != null && landed >= drawn + merges ? { landed: { commits: landed, merges } } : {}),
     },
     repos,
   };
