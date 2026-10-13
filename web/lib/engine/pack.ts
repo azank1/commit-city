@@ -21,6 +21,7 @@ interface Loc { pack: Buffer; start: number; type: number; base: string | null }
 const TYPE_NAME = ['', 'commit', 'tree', 'blob', 'tag'];
 const OFS_DELTA = 6, REF_DELTA = 7;
 const BINARY_PROBE = 8000;    // git's buffer_is_binary(): a NUL in the first 8000 bytes
+export const TREE_SLAB = 1 << 20;    // kept trees are copied into shared slabs of this size
 
 export class ObjectDB {
   commits = new Map<string, Commit>();
@@ -32,6 +33,8 @@ export class ObjectDB {
   guard: (() => void) | null = null;
   private locs = new Map<string, Loc>();      // where each object lives, to read one again later
   private keepLocs = true;
+  private slab: Buffer | null = null;
+  private slabUsed = 0;
 
   /** Forget object locations (and with them the pack buffers) once nothing more needs reading. */
   releaseReads() { this.locs.clear(); this.keepLocs = false; }
@@ -112,6 +115,19 @@ export class ObjectDB {
     return base ? applyDelta(base, raw) : null;
   }
 
+  /** A tree to keep for the replay, copied out of the buffer it was built in when that buffer is bigger. An inflated
+   *  object is a view of zlib's 16 KB output buffer and a small delta result a slice of Node's shared 8 KB pool, so
+   *  a 300-byte tree kept as it came held 16 KB: anomalyco/opencode's window held 129 MB of trees in 684 MB. */
+  private hold(data: Buffer): Buffer {
+    if (data.byteOffset === 0 && data.length === data.buffer.byteLength) return data;
+    if (data.length > TREE_SLAB / 16) return Buffer.from(data);
+    if (!this.slab || this.slabUsed + data.length > this.slab.length) { this.slab = Buffer.allocUnsafeSlow(TREE_SLAB); this.slabUsed = 0; }
+    const out = this.slab.subarray(this.slabUsed, this.slabUsed + data.length);
+    data.copy(out);
+    this.slabUsed += data.length;
+    return out;
+  }
+
   private process(type: number, data: Buffer): string {
     const h = createHash('sha1');
     h.update(`${TYPE_NAME[type]} ${data.length}\0`);
@@ -119,7 +135,7 @@ export class ObjectDB {
     const sha = h.digest('hex');
     if ((++this.objects & 1023) === 0) this.guard?.();
     if (type === 1) this.commits.set(sha, parseCommit(sha, data));
-    else if (type === 2) this.trees.set(sha, data);
+    else if (type === 2) this.trees.set(sha, this.hold(data));
     else if (type === 3) this.blobs.set(sha, blobInfo(data));
     return sha;
   }
