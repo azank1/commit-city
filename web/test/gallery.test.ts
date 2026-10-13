@@ -63,3 +63,14 @@ test('a gallery written before versions is read, and carried into the first vers
   await addToGallery(meta('new', 4));
   assert.deepEqual((await readGallery()).map(e => e.key), ['new', 'old']);
 });
+
+test('the landing lists show one city per repo, under the name GitHub uses now', async () => {
+  setStore(new StaleCdnStore());
+  const { GET } = await import('../lib/routes/gallery');
+  await addToGallery({ ...meta('facebook/react', 685), target: 'react/react' });      // built before the repo moved
+  await addToGallery(meta('react/react', 689));
+  await putJSON('meta/react/react.json', meta('react/react', 689));
+  const g = await (await GET(new Request('https://commit.city/api/gallery'))).json() as { featured: { key: string }[]; recent: { key: string; commits: number }[] };
+  assert.deepEqual(g.recent.map(e => [e.key, e.commits]), [['react/react', 689]]);
+  assert.deepEqual(g.featured.map(e => e.key), ['react/react']);
+});
