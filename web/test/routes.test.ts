@@ -35,6 +35,7 @@ test('a GitHub URL with commit.city swapped in lands on the city', () => {
     ['/orgs/vercel', 'redirect /vercel'],
     ['/orgs/vercel/repositories', 'redirect /vercel'],
     // the site's own paths are left alone
+    ['/api/version', 'rewrite /api/site?op=version'],
     ['/api/build/repo', null],
     ['/s/f/inter.woff2', null],
     ['/v/app.a63cdb5695.js', null],
@@ -42,4 +43,25 @@ test('a GitHub URL with commit.city swapped in lands on the city', () => {
     ['/about', null],
   ];
   for (const [p, want] of cases) assert.equal(route(p), want, p);
+});
+
+test('/api/version names the commit this deployment was built from, and never guesses', async () => {
+  const { GET } = await import('../lib/routes/version');
+  const saved = { sha: process.env.VERCEL_GIT_COMMIT_SHA, ref: process.env.VERCEL_GIT_COMMIT_REF };
+  try {
+    process.env.VERCEL_GIT_COMMIT_SHA = 'a'.repeat(40);
+    process.env.VERCEL_GIT_COMMIT_REF = 'main';
+    const r = await GET(new Request('https://commit.city/api/site?op=version'));
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await r.json(), { commit: 'a'.repeat(40), source: 'env:VERCEL_GIT_COMMIT_SHA', ref: 'main' });
+    for (const bad of [undefined, '', 'abc1234']) {
+      if (bad === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA; else process.env.VERCEL_GIT_COMMIT_SHA = bad;
+      assert.equal((await GET(new Request('https://commit.city/api/site?op=version'))).status, 503);
+    }
+  } finally {
+    for (const [k, v] of [['VERCEL_GIT_COMMIT_SHA', saved.sha], ['VERCEL_GIT_COMMIT_REF', saved.ref]] as const) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
 });

@@ -16,7 +16,7 @@
   "rewrites": [
     { "source": "/api/auth/:op(login|callback|logout)", "destination": "/api/account?op=:op" },
     { "source": "/api/:op(me|settings)", "destination": "/api/account?op=:op" },
-    { "source": "/api/:op(city|gallery|stars|live|pulse)", "destination": "/api/site?op=:op" },
+    { "source": "/api/:op(city|gallery|stars|live|pulse|version)", "destination": "/api/site?op=:op" },
     { "source": "/:owner((?!(?:api|v|s|u|fonts|local-store|explore|events|readme|about|404|index)(?:/|$))[A-Za-z0-9][A-Za-z0-9-]{0,38})", "destination": "/api/page?t=:owner" },
     { "source": "/:owner((?!(?:api|v|s|u|fonts|local-store|explore|events|readme|about|404|index)(?:/|$))[A-Za-z0-9][A-Za-z0-9-]{0,38})/:repo([A-Za-z0-9._-]{1,100})", "destination": "/api/page?t=:owner/:repo" }
   ],
