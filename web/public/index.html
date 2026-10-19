@@ -25,7 +25,7 @@
 <meta name="twitter:description" content="Swap github.com for commit.city on any GitHub profile, org or repo and watch a year of commits replay as a 3D city. Every file a tower, every commit a beam of light, every AI agent accounted for.">
 <meta name="twitter:image" content="https://commit.city/api/og">
 <link rel="preload" href="/s/f/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/s/site.css?v=4a58d6b3">
+<link rel="stylesheet" href="/s/site.css?v=92373990">
 <style>
 /* hero */
 .hero { position: relative; padding: clamp(40px, 6vw, 84px) 0 clamp(40px, 6vw, 72px); }
@@ -166,7 +166,7 @@
 .closing .h2 { margin: 14px auto 26px; max-width: 760px; }
 .closing form.omni { max-width: 620px; margin: 0 auto; text-align: left; }
 </style>
-<script src="/s/site.js?v=8b3577f9" defer></script>
+<script src="/s/site.js?v=0cf12122" defer></script>
 </head>
 <body class="home">
 <header class="nav">
@@ -611,7 +611,7 @@ const D = { q: '', kind: '', sort: 'featured', all: false };
 const cols = () => getComputedStyle($('#tiles')).gridTemplateColumns.split(' ').length;
 const twoRows = () => Math.max(4, 2 * cols());
 const SORTS = {
-  featured: () => 0,                                    // the gallery's own order: featured, then latest built
+  featured: () => 0,                                    // the gallery's own order: yours, featured, then latest built
   recent: (a, b) => (b.v || 0) - (a.v || 0),
   commits: (a, b) => b.commits - a.commits,
   agent: (a, b) => (b.agent || 0) - (a.agent || 0) || b.commits - a.commits,

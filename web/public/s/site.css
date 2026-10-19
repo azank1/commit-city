@@ -217,6 +217,7 @@ select.select { height: 38px; padding: 0 30px 0 12px; border-radius: 10px; borde
 .tile .badge { position: absolute; left: 10px; top: 10px; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; color: var(--ink-2); background: rgba(4, 6, 12, 0.72);
   border: 1px solid var(--line); backdrop-filter: blur(6px); }
 .tile .badge.ag { left: auto; right: 10px; color: var(--agent); border-color: rgba(197, 139, 255, 0.35); }
+.tile .badge.me { color: var(--accent); border-color: rgba(95, 211, 243, 0.4); }
 .tile .meta { display: flex; align-items: center; gap: 11px; padding: 13px 14px 12px; }
 .tile .meta img { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-3); flex: none; }
 .tile .meta img.sq { border-radius: 8px; }

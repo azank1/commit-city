@@ -232,25 +232,6 @@
 
 <hr class="rule">
 
-<section class="section" id="read">
-  <div class="wrap read">
-    <div class="rv">
-      <svg class="iso" id="iso" viewBox="0 0 620 428" role="img" aria-label="An annotated miniature city: an island, platforms, towers and a commit beam"></svg>
-    </div>
-    <div>
-      <div class="section-head rv" style="margin-bottom:22px">
-        <span class="kick">Reading a city</span>
-        <h2 class="h2">Real history, drawn to scale.</h2>
-        <p>commit.city doesn't estimate from contribution counts. It replays git itself, so a tower is exactly as tall as that file was on that day.</p>
-      </div>
-      <ul class="keys rv d1" id="keys"></ul>
-      <div class="langs rv d2" id="langs"></div>
-    </div>
-  </div>
-</section>
-
-<hr class="rule">
-
 <section class="section share" id="share">
   <div class="wrap">
     <div class="section-head rv">
@@ -284,6 +265,25 @@
         <span class="v">width</span>=<span class="s">"100%"</span> <span class="v">height</span>=<span class="s">"480"</span><span class="k">&gt;&lt;/iframe&gt;</span></pre><button class="copy" data-copy='&lt;iframe src="https://commit.city/you#embed=1" width="100%" height="480" style="border:0;border-radius:12px"&gt;&lt;/iframe&gt;'>Copy</button></div>
         <a class="btn ghost" href="/about#api" style="align-self:flex-start;margin-left:-12px">All parameters <span class="arrow">→</span></a>
       </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section class="section" id="read">
+  <div class="wrap read">
+    <div class="rv">
+      <svg class="iso" id="iso" viewBox="0 0 620 428" role="img" aria-label="An annotated miniature city: an island, platforms, towers and a commit beam"></svg>
+    </div>
+    <div>
+      <div class="section-head rv" style="margin-bottom:22px">
+        <span class="kick">Reading a city</span>
+        <h2 class="h2">Real history, drawn to scale.</h2>
+        <p>commit.city doesn't estimate from contribution counts. It replays git itself, so a tower is exactly as tall as that file was on that day.</p>
+      </div>
+      <ul class="keys rv d1" id="keys"></ul>
+      <div class="langs rv d2" id="langs"></div>
     </div>
   </div>
 </section>
@@ -571,7 +571,7 @@ const D = { q: '', kind: '', sort: 'featured', all: false };
 const cols = () => getComputedStyle($('#tiles')).gridTemplateColumns.split(' ').length;
 const twoRows = () => Math.max(4, 2 * cols());
 const SORTS = {
-  featured: () => 0,                                    // the gallery's own order: featured, then latest built
+  featured: () => 0,                                    // the gallery's own order: yours, featured, then latest built
   recent: (a, b) => (b.v || 0) - (a.v || 0),
   commits: (a, b) => b.commits - a.commits,
   agent: (a, b) => (b.agent || 0) - (a.agent || 0) || b.commits - a.commits,

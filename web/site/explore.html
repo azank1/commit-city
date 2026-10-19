@@ -54,7 +54,11 @@
 <div class="results">
   <div class="wrap">
     <div id="featuredBox">
-      <div class="group-h"><h2>Featured</h2><small>hand-picked to show what a city can look like</small></div>
+      <div id="mineBox" hidden>
+        <div class="group-h"><h2>Yours</h2><small id="mineNote">built from this browser</small></div>
+        <div class="tiles" id="mine"></div>
+      </div>
+      <div class="group-h" id="featH"><h2>Featured</h2><small>hand-picked to show what a city can look like</small></div>
       <div class="tiles" id="featured"></div>
       <div class="group-h" id="freshH" style="margin-top:40px"><h2>Fresh off the press</h2><small>the latest builds, newest first</small></div>
     </div>
@@ -96,18 +100,29 @@ const SORTS = {
 function render() {
   if (!G) return;
   const plain = !state.q && !state.kind && state.sort === 'recent';
-  $('#featuredBox').hidden = !plain || !G.featured.length;
-  if (plain) $('#featured').innerHTML = G.featured.map(e => tile(e)).join('');
-  const seen = new Set(plain ? G.featured.map(e => e.key) : []);
+  // the plain view is three shelves: yours, featured, then the latest builds, each city on one of them only
+  const mine = new Set(G.mine.map(e => e.key));
+  const featured = G.featured.filter(e => !mine.has(e.key));
+  $('#featuredBox').hidden = !plain || !(G.mine.length || G.featured.length);
+  $('#mineBox').hidden = !G.mine.length;
+  $('#featH').hidden = $('#featured').hidden = !featured.length;
+  $('#featH').style.marginTop = G.mine.length ? '40px' : '';
+  if (plain) {
+    $('#mine').innerHTML = G.mine.map(e => tile(e)).join('');
+    $('#mineNote').textContent = window.CCSite.me && G.mine.some(e => e.key === window.CCSite.me.toLowerCase())
+      ? 'your own city, and the ones built from this browser' : 'built from this browser';
+    $('#featured').innerHTML = featured.map(e => tile(e)).join('');
+  }
+  const seen = new Set(plain ? [...mine, ...featured.map(e => e.key)] : []);
   const q = state.q.trim().toLowerCase();
   let list = (plain ? G.recent : G.all).filter(e => !seen.has(e.key) && (!state.kind || e.kind === state.kind) && (!q || e.target.toLowerCase().includes(q)));
   list = list.slice().sort(SORTS[state.sort] || SORTS.recent);
   $('#grid').innerHTML = list.length ? list.map(e => tile(e)).join('')
     : `<div class="empty" style="grid-column:1/-1">${q ? `Nothing built matches <b>${esc(q)}</b> yet. <a href="/${esc(window.CCSite.parse(q) || '')}">Build it →</a>` : 'Nothing here yet.'}</div>`;
   // with nothing beyond the featured cities yet, skip the empty 'fresh' shelf rather than show it
-  const bare = plain && !list.length && G.featured.length;
+  const bare = plain && !list.length && (G.mine.length || featured.length);
   $('#freshH').hidden = $('#grid').hidden = !!bare;
-  const n = (plain ? G.featured.length : 0) + list.length;
+  const n = (plain ? G.mine.length + featured.length : 0) + list.length;
   $('#count').textContent = `${n} ${n === 1 ? 'city' : 'cities'}`;
   const qs = new URLSearchParams();
   if (state.q) qs.set('q', state.q);
