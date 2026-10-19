@@ -219,8 +219,21 @@
       return fail(e);
     }
     clearInterval(clock);
+    remember(meta);
     if (history.replaceState) history.replaceState(null, '', pagePath() + location.hash);
     await open(meta);
+  }
+
+  // The cities this browser built, newest first, as gallery entries: the home page and /explore lead with them
+  // (site.js reads the list). It stays in this browser.
+  function remember(m) {
+    const share = n => (m.commits ? Math.round((1000 * n) / m.commits) / 1000 : 0);
+    const e = { key: m.key, target: m.target, kind: m.kind, avatar: m.avatar, commits: m.commits, repos: m.repos, lines: m.lines, v: m.v,
+      agent: share((m.who || {}).agent || 0), bot: share((m.who || {}).bot || 0) };
+    try {
+      const kept = JSON.parse(localStorage.getItem('cc.mine') || '[]').filter(x => x && x.key !== e.key);
+      localStorage.setItem('cc.mine', JSON.stringify([e, ...kept].slice(0, 24)));
+    } catch { /* storage off: the gallery still lists it */ }
   }
 
   function fail(e) {

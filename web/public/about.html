@@ -25,7 +25,7 @@
 <meta name="twitter:description" content="How commit.city turns GitHub history into a 3D city: URLs, reading a city, the agent lens, the live view, sharing, privacy and opt-out, limits, self-hosting for private repos, and the API.">
 <meta name="twitter:image" content="https://commit.city/api/og?page=about">
 <link rel="preload" href="/s/f/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/s/site.css?v=4a58d6b3">
+<link rel="stylesheet" href="/s/site.css?v=92373990">
 <style>
 .docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; padding: 8px 0 100px; }
 .toc { position: sticky; top: calc(var(--nav-h) + 24px); align-self: start; display: grid; gap: 2px; font-size: 14px; }
@@ -62,7 +62,7 @@
 @media (max-width: 960px) { .docs { grid-template-columns: minmax(0, 1fr); } .toc { display: none; } }
 @media (max-width: 640px) { .flow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .flow div::after { display: none; } }
 </style>
-<script src="/s/site.js?v=8b3577f9" defer></script>
+<script src="/s/site.js?v=0cf12122" defer></script>
 </head>
 <body>
 <header class="nav">
@@ -179,7 +179,7 @@
       <ul>
         <li><b>Public data only.</b> The builder reads public repositories with a token that can't see anything private. Private repos never appear on commit.city.</li>
         <li><b>No source code is kept.</b> A city stores file paths, line counts and timestamps, all things anyone can already see on GitHub. Repo records are cached so the next visitor doesn't rebuild them.</li>
-        <li><b>No ads, no trackers, no analytics cookies.</b> A cookie is set only if you sign in, to remember who you are.</li>
+        <li><b>No ads, no trackers, no analytics cookies.</b> A cookie is set only if you sign in, to remember who you are. The cities you build are listed in your own browser's storage, so the home page and Explore can show them first; that list never leaves your browser.</li>
         <li><b>Sign-in asks for no permissions.</b> It proves you own an account, so you can manage its city. Builds you start then use your own GitHub API quota.</li>
       </ul>
     </section>

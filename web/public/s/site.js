@@ -27,14 +27,24 @@
   const avatarOf = (owner, size = 64) => `https://github.com/${encodeURIComponent(owner)}.png?size=${size}`;
 
   // ─────────────────────────────────────────────── gallery feed (one fetch per page)
+  // `mine`: your own city when signed in, then the cities this browser built (city.js keeps that list), marked
+  // `mine` and first in `all`. The gallery's copy of one wins: it may be a newer build. One that has dropped out
+  // of the gallery's latest builds still shows, from the browser's copy.
   let galleryP = null;
   function gallery() {
     if (!galleryP) {
       galleryP = fetch('/api/gallery').then(r => (r.ok ? r.json() : { featured: [], recent: [] })).catch(() => ({ featured: [], recent: [] }))
         .then(g => {
-          const seen = new Set(), all = [];
-          for (const e of [...(g.featured || []), ...(g.recent || [])]) if (!seen.has(e.key)) { seen.add(e.key); all.push(e); }
-          return { featured: g.featured || [], recent: g.recent || [], all };
+          const listed = new Map();
+          for (const e of [...(g.featured || []), ...(g.recent || [])]) if (!listed.has(e.key)) listed.set(e.key, e);
+          let kept = [];
+          try { kept = JSON.parse(localStorage.getItem('cc.mine') || '[]'); } catch { /* storage off */ }
+          const mine = [], seen = new Set();
+          const add = e => { if (e && e.key && !seen.has(e.key)) { seen.add(e.key); mine.push({ ...e, mine: true }); } };
+          if (me && LOGIN.test(me)) add(listed.get(me.toLowerCase()));
+          for (const e of Array.isArray(kept) ? kept : []) add(listed.get(e && e.key) || e);
+          const all = [...mine, ...[...listed.values()].filter(e => !seen.has(e.key))];
+          return { featured: g.featured || [], recent: g.recent || [], mine, all };
         });
     }
     return galleryP;
@@ -200,7 +210,7 @@
     const split = (agent || bot) ? `<div class="split" title="${Math.round(human * 100)}% human · ${Math.round(bot * 100)}% bots · ${Math.round(agent * 100)}% AI agents">
       <span class="h" style="flex-grow:${human}"></span><span class="b" style="flex-grow:${bot}"></span><span class="a" style="flex-grow:${agent}"></span></div>` : '';
     return `<a class="tile" href="/${esc(n)}"><div class="sky"><img src="/api/card?t=${encodeURIComponent(e.target)}&layout=thumb&v=${e.v || 0}" alt="" loading="lazy" decoding="async">
-      <span class="badge">${kindLabel(e.kind)}</span>${agent >= 0.01 ? `<span class="badge ag">${Math.round(agent * 100)}% agent</span>` : ''}</div>
+      <span class="badge${e.mine ? ' me' : ''}">${e.mine ? 'yours · ' : ''}${kindLabel(e.kind)}</span>${agent >= 0.01 ? `<span class="badge ag">${Math.round(agent * 100)}% agent</span>` : ''}</div>
       <div class="meta"><img class="${e.kind === 'user' ? '' : 'sq'}" src="${esc(e.avatar)}${String(e.avatar).includes('?') ? '&' : '?'}s=64" alt="" loading="lazy">
       <div><b>${esc(e.target)}</b><small>${compact(e.commits)} commits · ${e.repos} repo${e.repos === 1 ? '' : 's'} · ${compact(e.lines)} lines</small></div></div>${opts.split === false ? '' : split}</a>`;
   }
