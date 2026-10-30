@@ -8,6 +8,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { layoutRepo, placeIslands, heightOf, STEP_H, BASE_H } from './layout.js';
 import * as SH from './shaders.js';
 import { agents as AGENT_RULES } from '../../schema/agents.json';
+import { season, setSeason, isHalloween, GH_HALLOWEEN, addHalloween } from './season.js';
 
 // ───────────────────────────────────────────────────────────── constants
 const $ = id => document.getElementById(id);
@@ -28,8 +29,16 @@ const WHO_RGB = WHO_HEX.map(h => new THREE.Color(h));
 const T_END = DATA.t_end;
 const TAU = 10 * 1440;                    // activity decay constant (minutes)
 const AY = 15;                            // avatar altitude
-const LANG_HEX = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767', '#7d7b75'];
-const DEPTH_HEX = ['#161d2b', '#1c2537', '#232e44', '#2a3751', '#31405e', '#38496b', '#3f5278'];
+// Halloween (season.js): on 31 October the city's own colours turn to GitHub's Halloween graph's; the agent lens's
+// colours, which are data, stay as they are
+const SPOOKY = season() === 'halloween';
+const hue = SPOOKY ? (r, g, b) => { const m = Math.max(r, g, b); return [m, m * 0.46, m * 0.1]; } : (r, g, b) => [r, g, b];   // cyan glow → orange, same strength
+const glow = (r, g, b) => new THREE.Color(...hue(r, g, b));
+const ACCENT_HEX = SPOOKY ? '#fa7a18' : '#5fd3f3';
+const LANG_HEX = SPOOKY ? ['#fe9600', '#ffc501', '#f3eee0', '#9b6dff', '#9be22d', '#c2410c', '#e0245e', '#37b5a0', '#6b6470']
+  : ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767', '#7d7b75'];
+const DEPTH_HEX = SPOOKY ? ['#1b1326', '#221830', '#291e3a', '#302444', '#372a4e', '#3e3058', '#453662']
+  : ['#161d2b', '#1c2537', '#232e44', '#2a3751', '#31405e', '#38496b', '#3f5278'];
 const SPEEDS = [
   { k: '1h', v: 60, label: '1 hr/s' }, { k: '6h', v: 360, label: '6 hr/s' }, { k: '1d', v: 1440, label: '1 day/s' },
   { k: '3d', v: 4320, label: '3 days/s' }, { k: '1w', v: 10080, label: '1 wk/s' }, { k: '2w', v: 20160, label: '2 wk/s' },
@@ -199,7 +208,7 @@ const PXK = { value: 0.001 };   // world units per screen pixel at distance 1
 // sky dome, stars, floor
 const sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 32, 16), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, vertexShader: SH.skyVS, fragmentShader: SH.skyFS,
-  uniforms: { uTop: { value: new THREE.Color(0.01, 0.018, 0.045) }, uHorizon: { value: new THREE.Color(0.03, 0.045, 0.09) }, uBottom: { value: new THREE.Color(0.004, 0.006, 0.012) } },
+  uniforms: { uTop: { value: new THREE.Color(0.01, 0.018, 0.045) }, uHorizon: { value: new THREE.Color(0.03, 0.045, 0.09) }, uBottom: { value: SPOOKY ? new THREE.Color(0.006, 0.002, 0.01) : new THREE.Color(0.004, 0.006, 0.012) } },
 }));
 scene.add(sky);
 const NIGHT = { value: 0.5 };
@@ -222,7 +231,7 @@ const NIGHT = { value: 0.5 };
 }
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(SCENE_R * 6, SCENE_R * 6), new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, vertexShader: SH.floorVS, fragmentShader: SH.floorFS,
-  uniforms: { uCol: { value: new THREE.Color(0.25, 0.55, 0.8) }, uFade: { value: SCENE_R * 1.9 } },
+  uniforms: { uCol: { value: glow(0.25, 0.55, 0.8) }, uFade: { value: SCENE_R * 1.9 } },
 }));
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -BASE_H - 1.2;
@@ -286,13 +295,13 @@ const avMats = [];
   edge.rotation.x = Math.PI / 2;
   avatarSpin.add(f, b, edge);
 }
-const rimMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 1.7, 2.4) });
+const rimMat = new THREE.MeshBasicMaterial({ color: glow(0.5, 1.7, 2.4) });
 const rim = new THREE.Mesh(new THREE.TorusGeometry(AV_R + 0.08, 0.1, 20, 200), rimMat);
 avatarSpin.add(rim);
 const orbitRings = [];
 for (const [rad, tilt, spd] of [[5.6, 0.55, 0.22], [6.6, -0.35, -0.15], [7.7, 1.2, 0.09]]) {
   const m = new THREE.Mesh(new THREE.TorusGeometry(rad, 0.022, 8, 256), new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0.35, 0.9, 1.3), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
+    color: glow(0.35, 0.9, 1.3), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
   const holder = new THREE.Group();
   holder.rotation.x = Math.PI / 2 + tilt;
   holder.add(m);
@@ -305,7 +314,7 @@ const halo = (() => {
     const th = Math.random() * Math.PI * 2, rr = 4.9 + Math.random() * 3.6, y = (Math.random() - 0.5) * 1.6 * Math.random();
     p[i * 3] = Math.cos(th) * rr; p[i * 3 + 1] = y; p[i * 3 + 2] = Math.sin(th) * rr;
     s[i] = 0.1 + Math.random() * 0.16; a[i] = 0.12 + Math.random() * 0.35;
-    c[i * 3] = 0.6; c[i * 3 + 1] = 1.3; c[i * 3 + 2] = 1.9;
+    c.set(hue(0.6, 1.3, 1.9), i * 3);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(p, 3));
@@ -323,7 +332,7 @@ const aura = (() => {
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3));
   g.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array([10]), 1));
   g.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array([0.1]), 1));
-  g.setAttribute('aColor', new THREE.BufferAttribute(new Float32Array([0.12, 0.42, 0.7]), 3));
+  g.setAttribute('aColor', new THREE.BufferAttribute(new Float32Array(hue(0.12, 0.42, 0.7)), 3));
   const m = new THREE.Points(g, new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     uniforms: { uScale: halo.material.uniforms.uScale }, vertexShader: SH.pointsVS, fragmentShader: SH.pointsFS }));
@@ -347,7 +356,7 @@ const solidMat = over => new THREE.ShaderMaterial({
   vertexShader: SH.solidVS, fragmentShader: SH.solidFS,
   uniforms: {
     ...ENV, uSat: { value: 1 }, uBright: { value: 1 }, uEdge: { value: 0.5 }, uEdgeTint: { value: new THREE.Color(0.015, 0.02, 0.03) },
-    uAO: { value: 0.42 }, uRim: { value: 0 }, uRimCol: { value: new THREE.Color(0.25, 0.95, 1.5) }, ...over,
+    uAO: { value: 0.42 }, uRim: { value: 0 }, uRimCol: { value: glow(0.25, 0.95, 1.5) }, ...over,
   },
 });
 const instGeo = n => {
@@ -371,7 +380,7 @@ for (const r of R) {
   // slab
   r.matBase = solidMat({ uEdge: { value: 0.75 }, uAO: { value: 0 }, uEdgeTint: { value: new THREE.Color(0.03, 0.05, 0.08) } });
   r.base = new THREE.InstancedMesh(instGeo(1), r.matBase, 1);
-  r.base.setColorAt(0, tmpC.set('#0e1522'));
+  r.base.setColorAt(0, tmpC.set(SPOOKY ? '#150e1d' : '#0e1522'));
   r.base.setMatrixAt(0, HIDDEN);
   r.base.boundingSphere = bs;
   r.base.userData = { kind: 'base', r };
@@ -417,7 +426,7 @@ for (const r of R) {
   tube.setAttribute('aU', new THREE.BufferAttribute(aU, 1));
   r.beamMat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexShader: SH.beamVS, fragmentShader: SH.beamFS,
-    uniforms: { uColor: { value: new THREE.Color(0.3, 0.92, 1.45) }, uAlpha: { value: 0 }, uTime: TIME, uFlow: { value: 0 }, uGrow: { value: 0 }, uWidth: { value: 0.1 }, uPx: { value: 1 }, uPxK: PXK, uFogDen: ENV.uFogDen },
+    uniforms: { uColor: { value: glow(0.3, 0.92, 1.45) }, uAlpha: { value: 0 }, uTime: TIME, uFlow: { value: 0 }, uGrow: { value: 0 }, uWidth: { value: 0.1 }, uPx: { value: 1 }, uPxK: PXK, uFogDen: ENV.uFogDen },
   });
   beamMats.push(r.beamMat);
   r.beam = new THREE.Mesh(tube, r.beamMat);
@@ -425,12 +434,12 @@ for (const r of R) {
   r.beam.visible = false;
   scene.add(r.beam);
   // port + tether
-  r.port = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.6, 2.2) }));
+  r.port = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 14), new THREE.MeshBasicMaterial({ color: glow(0.6, 1.6, 2.2) }));
   r.port.position.set(r.x, r.portY, r.z);
   r.port.visible = false;
   scene.add(r.port);
   const tg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(r.x, r.portY, r.z), new THREE.Vector3(r.x, 0, r.z)]);
-  r.tether = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: new THREE.Color(0.4, 0.9, 1.3), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  r.tether = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: glow(0.4, 0.9, 1.3), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
   r.tether.visible = false;
   scene.add(r.tether);
   // pulse path (beam then tether), arc-length parametrised
@@ -455,6 +464,7 @@ for (const r of R) {
   Object.assign(r, { whoCum: new Uint32Array(WHO.length), cum: 0, heat: 0, act: 0, last: -Infinity, alive: 0, lines: 0, baseV: 0, baseFrom: 0, baseTo: 0, baseT0: 0,
     flash: 0, beamGrow: 0, beamBorn: false, dirty: false, platDirty: false, glowDirty: false, platGlowDirty: false });
 }
+const HW = SPOOKY ? addHalloween(scene, { radius: SCENE_R, ay: AY }) : null;   // moon, bats, ghosts
 // org sector labels
 for (const s of sectors) {
   const el = document.createElement('div');
@@ -573,6 +583,10 @@ function applyEvent(k, live) {
   const i = eF[k], s = eS[k], old = cur[i];
   cur[i] = s;
   const r = R[fRepo[i]];
+  if (HW && live && old > 0 && s <= 0) {         // Halloween: a deleted file gives up its ghost where it stood
+    const q = i - r.f0, fr = r.lay.fileRect, d = r.lay.dirs[r.lay.fileDir[q]];
+    HW.ghost(r.x + fr[q * 4], d.depth * STEP_H + heightOf(old), r.z + fr[q * 4 + 1]);
+  }
   r.lines += s - old; totalLines += s - old;
   aliveDelta(i, old > 0, s > 0);
   setHeight(i, heightOf(s), live ? (old > 0 && s > 0 ? 0.55 : 0.75) : 0.3);
@@ -696,7 +710,7 @@ function updatePulses() {
   for (let k = 0; k < pulses.length; k++) {
     const p = pulses[k], u = easeIO(clamp((NOW - p.t0) / p.dur, 0, 1));
     const big = Math.min(1.8, 1 + Math.log2(p.n) * 0.25) * (p.live ? 1.5 : 1);
-    const lit = lens || p.live ? p.col : null, dim = lens && p.human && !p.live ? 0.5 : 1;
+    const lit = lens || (p.live && !(SPOOKY && p.human)) ? p.col : null, dim = lens && p.human && !p.live ? 0.5 : 1;   // Halloween: people's live events glow orange outside the lens
     for (let j = 0; j < TRAIL; j++) {
       const uj = u - j * 0.016;
       const o = k * TRAIL + j;
@@ -709,7 +723,7 @@ function updatePulses() {
       if (lit) {
         const b = j === 0 ? 3.4 : 2.6, w = j === 0 ? 0.5 : 0;
         pCol[o * 3] = lit.r * b + w; pCol[o * 3 + 1] = lit.g * b + w; pCol[o * 3 + 2] = lit.b * b + w;
-      } else { pCol[o * 3] = 1.4 + 1.2 * (j === 0); pCol[o * 3 + 1] = 2.2 + 0.8 * (j === 0); pCol[o * 3 + 2] = 2.8; }
+      } else pCol.set(hue(1.4 + 1.2 * (j === 0), 2.2 + 0.8 * (j === 0), 2.8), o * 3);
     }
   }
   for (const n of ['position', 'aSize', 'aAlpha', 'aColor']) pGeo.attributes[n].needsUpdate = true;
@@ -718,13 +732,13 @@ const waves = [];
 const waveGeo = new THREE.RingGeometry(0.94, 1, 96);
 waveGeo.rotateX(-Math.PI / 2);
 for (let k = 0; k < 40; k++) {
-  const m = new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 1.4, 2.0), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const m = new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({ color: glow(0.5, 1.4, 2.0), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
   m.visible = false;
   scene.add(m);
   waves.push({ m, t0: -1e9, r: null });
 }
 let waveIdx = 0;
-const WAVE_COL = new THREE.Color(0.5, 1.4, 2.0);
+const WAVE_COL = glow(0.5, 1.4, 2.0);
 function arrive(p) {
   const r = p.r;
   for (const files of p.files) for (let q = 0; q < files.length; q++) {
@@ -734,7 +748,7 @@ function arrive(p) {
   r.flash = Math.min(1.6, r.flash + 0.6 + 0.1 * p.n);
   const w = waves[waveIdx++ % waves.length];
   w.t0 = NOW; w.r = r; w.m.visible = true;
-  if ((lens || p.live) && p.col) w.m.material.color.copy(p.col).multiplyScalar(2.2); else w.m.material.color.copy(WAVE_COL);
+  if ((lens || (p.live && !(SPOOKY && p.human))) && p.col) w.m.material.color.copy(p.col).multiplyScalar(2.2); else w.m.material.color.copy(WAVE_COL);
   w.m.position.set(r.x, 0.06, r.z);
   r.labelEl.classList.remove('bump'); void r.labelEl.offsetWidth; r.labelEl.classList.add('bump');
 }
@@ -814,7 +828,7 @@ function whoMix(r, out) {
   if (n) out.lerp(otherC.multiplyScalar(1 / n), Math.sqrt(n / r.cum));
   return out;
 }
-const BEAM_COL = new THREE.Color(0.3, 0.92, 1.45);
+const BEAM_COL = glow(0.3, 0.92, 1.45);
 function updateRepoVisuals(dt) {
   for (const r of R) {
     const a = 1 - Math.exp(-r.heat / 1.4);
@@ -845,7 +859,7 @@ function updateRepoVisuals(dt) {
         whoMix(r, mixC);
         r.beamMat.uniforms.uColor.value.copy(mixC).multiplyScalar(1.7);
         r.port.material.color.copy(mixC).multiplyScalar(0.7 + 1.6 * act);
-      } else r.port.material.color.setRGB(0.25 + 0.5 * act, 0.5 + 1.3 * act, 0.7 + 1.7 * act);
+      } else r.port.material.color.setRGB(...hue(0.25 + 0.5 * act, 0.5 + 1.3 * act, 0.7 + 1.7 * act));
       r.tether.visible = true;
       r.tether.material.opacity = (0.05 + 0.4 * act) * iso;
     } else {
@@ -894,11 +908,12 @@ function updateLabels() {
 }
 
 // ───────────────────────────────────────────────────────────── day / night (PKT clock)
-const C_SKY_DAY = new THREE.Color(0.44, 0.46, 0.52), C_SKY_NIGHT = new THREE.Color(0.25, 0.27, 0.34);
-const C_GR_DAY = new THREE.Color(0.1, 0.09, 0.08), C_GR_NIGHT = new THREE.Color(0.035, 0.045, 0.07);
-const C_KEY_DAY = new THREE.Color(1.0, 0.97, 0.93), C_KEY_NIGHT = new THREE.Color(0.58, 0.6, 0.7);
-const C_TOP_DAY = new THREE.Color(0.018, 0.035, 0.085), C_TOP_NIGHT = new THREE.Color(0.003, 0.006, 0.016);
-const C_HOR_DAY = new THREE.Color(0.06, 0.085, 0.15), C_HOR_NIGHT = new THREE.Color(0.014, 0.02, 0.042);
+const C3 = (a, b) => new THREE.Color(...(SPOOKY ? b : a));   // Halloween: a purple-black sky (GitHub's #03001c), a dusky horizon, moonlight
+const C_SKY_DAY = C3([0.44, 0.46, 0.52], [0.42, 0.36, 0.5]), C_SKY_NIGHT = C3([0.25, 0.27, 0.34], [0.26, 0.2, 0.34]);
+const C_GR_DAY = C3([0.1, 0.09, 0.08], [0.12, 0.06, 0.03]), C_GR_NIGHT = C3([0.035, 0.045, 0.07], [0.06, 0.03, 0.04]);
+const C_KEY_DAY = C3([1.0, 0.97, 0.93], [1.0, 0.9, 0.78]), C_KEY_NIGHT = C3([0.58, 0.6, 0.7], [0.62, 0.56, 0.72]);
+const C_TOP_DAY = C3([0.018, 0.035, 0.085], [0.03, 0.012, 0.06]), C_TOP_NIGHT = C3([0.003, 0.006, 0.016], [0.006, 0.0015, 0.016]);
+const C_HOR_DAY = C3([0.06, 0.085, 0.15], [0.11, 0.04, 0.06]), C_HOR_NIGHT = C3([0.014, 0.02, 0.042], [0.03, 0.01, 0.03]);
 let nightNow = 0.5;
 function dayNight() {
   const hour = ((T % 1440) + 1440) % 1440 / 60;
@@ -1098,7 +1113,7 @@ function setLens(on, quiet) {
     const all = new Uint32Array(WHO.length);
     for (const c of C) all[c.w]++;
     const bot = WHO.indexOf('bot'), agent = all.reduce((a, n, w) => a + (w && w !== bot ? n : 0), 0);
-    toast(HAS_WHO ? `agent lens: ${pctTxt(bot > 0 ? all[bot] / NC : 0)} bots · ${pctTxt(agent / NC)} AI agents over the whole window`
+    toast(HAS_WHO ? `${SPOOKY ? '👻 ghostwriter lens' : 'agent lens'}: ${pctTxt(bot > 0 ? all[bot] / NC : 0)} bots · ${pctTxt(agent / NC)} AI agents over the whole window`
       : 'agent lens: no bot or agent signatures here, every commit reads as human', 'lens');
   }
 }
@@ -1259,7 +1274,7 @@ function drawTicker() {
     const v = vals[k];
     const bh = v ? Math.max(2, (ch - 4) * Math.sqrt(v / mx)) : 1;
     const hourOfDay = ((Math.floor((hourStart - (47 - k) * 60) / 60) % 24) + 24) % 24;
-    tk.fillStyle = k === 47 ? '#9be7ff' : v ? '#4f9fdc' : 'rgba(150,170,200,0.18)';
+    tk.fillStyle = k === 47 ? (SPOOKY ? '#fddf68' : '#9be7ff') : v ? (SPOOKY ? '#fa7a18' : '#4f9fdc') : 'rgba(150,170,200,0.18)';
     const x = k * bw + 0.5, w = Math.max(1, bw - 1.5);
     if (bh > 3) { roundTop(tk, x, ch - bh, w, bh, Math.min(2, w / 2)); } else tk.fillRect(x, ch - bh, w, bh);
     if (hourOfDay === 0 && k > 0) { tk.fillStyle = 'rgba(200,215,235,0.35)'; tk.fillRect(x - 1, 0, 1, ch); }
@@ -1281,13 +1296,19 @@ function drawTimelineBg() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const w = cw - TL_PAD * 2, base = ch - 16;
   const mx = Math.max(...dayCounts);
+  // Halloween: each day in GitHub's Halloween graph colours, its level the quartile it falls in among days with commits
+  let lv = null;
+  if (SPOOKY) {
+    const nz = [...dayCounts].filter(Boolean).sort((a, b) => a - b), q = f => nz[Math.min(nz.length - 1, Math.floor(nz.length * f))] || 0;
+    lv = [q(0.25), q(0.5), q(0.75)];
+  }
   g.fillStyle = 'rgba(160,180,210,0.12)';
   g.fillRect(TL_PAD, base, w, 1);
   for (let d = 0; d < N_DAYS; d++) {
     const v = dayCounts[d];
     if (!v) continue;
     const x = TL_PAD + (d * 1440 / T_END) * w, bh = Math.max(1.5, (base - 4) * Math.sqrt(v / mx)), bw = Math.max(1, w / N_DAYS - 0.4);
-    g.fillStyle = 'rgba(120,170,230,0.55)';
+    g.fillStyle = lv ? GH_HALLOWEEN.dark[v <= lv[0] ? 1 : v <= lv[1] ? 2 : v <= lv[2] ? 3 : 4] : 'rgba(120,170,230,0.55)';
     g.fillRect(x, base - bh, bw, bh);
     if (lens && dayWho[d * WHO.length] < v) {           // people at the bottom, everyone else stacked on top
       let y = base - bh;
@@ -1331,9 +1352,9 @@ function drawTimeline() {
   tl.drawImage(tlBg, 0, 0);
   tl.setTransform(dpr, 0, 0, dpr, 0, 0);
   const w = cw - TL_PAD * 2, base = ch - 16, x = TL_PAD + (T / T_END) * w;
-  tl.fillStyle = 'rgba(95,211,243,0.10)';
+  tl.fillStyle = SPOOKY ? 'rgba(250,122,24,0.10)' : 'rgba(95,211,243,0.10)';
   tl.fillRect(TL_PAD, 0, x - TL_PAD, base);
-  tl.fillStyle = '#9be7ff';
+  tl.fillStyle = SPOOKY ? '#fddf68' : '#9be7ff';
   tl.fillRect(x - 1, 0, 2, base + 4);
   tl.beginPath(); tl.arc(x, 4, 4, 0, Math.PI * 2); tl.fill();
   if (tlHover >= 0) {
@@ -1644,7 +1665,7 @@ function drawRecFrame() {
     let tx = x - w / 2 + 7 * k;
     g.font = f2; g.fillStyle = '#7f8ca2'; g.fillText(r.owner, tx, y); tx += wo + gap;
     g.font = f1; g.fillStyle = '#e8eef7'; g.fillText(r.short, tx, y); tx += wn + gap;
-    g.fillStyle = lens ? (r.whoCum[0] === r.cum ? '#5fd3f3' : '#c58bff') : '#5fd3f3'; g.fillText(String(r.cum), tx, y);
+    g.fillStyle = lens ? (r.whoCum[0] === r.cum ? '#5fd3f3' : '#c58bff') : ACCENT_HEX; g.fillText(String(r.cum), tx, y);
   }
   g.globalAlpha = 1;
   // title, date and counter over a soft vignette
@@ -1656,7 +1677,7 @@ function drawRecFrame() {
   g.fillStyle = gr; g.fillRect(0, H - 110 * u, W, 110 * u);
   const P = 32 * u;
   g.textBaseline = 'alphabetic'; g.textAlign = 'left';
-  g.font = `600 ${15 * u}px system-ui, sans-serif`; g.fillStyle = '#5fd3f3'; g.fillText('commit.city', P, P + 12 * u);
+  g.font = `600 ${15 * u}px system-ui, sans-serif`; g.fillStyle = ACCENT_HEX; g.fillText('commit.city', P, P + 12 * u);
   g.font = `700 ${34 * u}px system-ui, sans-serif`; g.fillStyle = '#f2f6fb'; g.fillText(TARGET, P, P + 52 * u, W * 0.6);
   g.font = `500 ${17 * u}px system-ui, sans-serif`; g.fillStyle = '#b4c0d3'; g.fillText(DTF_DATE.format(tDate(T)), P, P + 80 * u);
   g.textAlign = 'right';
@@ -1671,7 +1692,7 @@ function drawRecFrame() {
   // the year as a progress bar, and where to find it
   const bx = P, bw = W - P * 2, by = H - 26 * u;
   g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(bx, by, bw, 4 * u);
-  g.fillStyle = '#5fd3f3'; g.shadowColor = '#5fd3f3'; g.shadowBlur = 10 * u;
+  g.fillStyle = ACCENT_HEX; g.shadowColor = ACCENT_HEX; g.shadowBlur = 10 * u;
   g.fillRect(bx, by, bw * clamp(T / T_END, 0, 1), 4 * u); g.shadowBlur = 0;
   g.font = `500 ${14 * u}px ui-monospace, SFMono-Regular, Menlo, monospace`; g.fillStyle = '#b4c0d3';
   g.fillText(`commit.city/${TARGET}`, bx, by - 12 * u);
@@ -1775,13 +1796,14 @@ function frame(now, logicOnly = false) {
   avatarSpin.rotation.z = Math.sin(NOW * 0.7) * 0.05;
   avatarSpin.rotation.x = Math.sin(NOW * 0.9) * 0.04;
   avatarSpin.scale.setScalar(1 + avatarKick * 0.05);
-  rimMat.color.setRGB(0.5 + avatarKick * 1.6, 1.6 + avatarKick * 1.8, 2.2 + avatarKick * 1.6);
+  rimMat.color.setRGB(...hue(0.5 + avatarKick * 1.6, 1.6 + avatarKick * 1.8, 2.2 + avatarKick * 1.6));
   for (const o of orbitRings) o.m.rotation.z += o.spd * dt * (1 + avatarKick * 3);
   halo.rotation.y += dt * (0.08 + avatarKick * 0.6);
   aura.material.uniforms.uScale.value = halo.material.uniforms.uScale.value;
   dayNight();
   updateFly();
   controls.update(dt);
+  if (HW) HW.update(dt, camera);
   doPick();
   try {
     updateHUD();
@@ -1803,6 +1825,21 @@ function frame(now, logicOnly = false) {
 }
 
 const init = parseHash();
+{
+  // the Halloween toggle shows on the day (or when the look was asked for); off lasts until next year
+  const b = $('btn-season');
+  document.body.classList.toggle('spooky', SPOOKY);
+  if (b && (SPOOKY || isHalloween())) {
+    b.hidden = false; b.classList.toggle('on', SPOOKY);
+    b.title = SPOOKY ? 'Halloween: GitHub\'s Halloween colours, a moon, bats, and a ghost for every file deleted. Click to turn it off' : 'Turn the Halloween look on';
+    b.addEventListener('click', () => setSeason(!SPOOKY));
+  }
+  if (SPOOKY) {
+    $('btn-lens').textContent = '👻 agents';
+    $('btn-lens').title = 'Ghostwriter lens: colour commits by human, bot or AI agent (A)';
+    if (!init.embed) setTimeout(() => toast('🎃 GitHub\'s graph is orange today, so is this city. Every deleted file gives up a ghost', 'new'), 1600);
+  }
+}
 setSpeed(init.speed ?? 3);
 curSpeed = SPEEDS[speedIdx].v;
 onResize();
@@ -1826,11 +1863,19 @@ setPlaying(init.play ?? true);
 el.loading.classList.add('done');
 setTimeout(() => el.loading.remove(), 900);
 requestAnimationFrame(loop);
+// for the Halloween self-test: how many files the replay deletes after t0, up to t1 (each raises a ghost when played)
+function deletionsBetween(t0, t1) {
+  const size = new Float32Array(NF);
+  let n = 0;
+  for (let k = 0; k < NE && eT[k] <= t1; k++) { if (eT[k] > t0 && size[eF[k]] > 0 && eS[k] <= 0) n++; size[eF[k]] = eS[k]; }
+  return n;
+}
 function step(seconds, render = false) {      // deterministic frames for the self-test (render: draw them too)
   let t = Math.max(performance.now(), lastFrame);
   for (let k = 0; k < Math.max(1, Math.round(seconds * 60)); k++) { t += 1000 / 60; frame(t, !render); }
 }
 window.__lapse = { step, R, seek, advance, get T() { return T; }, get playing() { return playing; }, focusRepo, camera, controls, T_END, EPOCH,
   get lens() { return lens; }, setLens, WHO, whoSoFar, record, stopRecord, recMime, toggleRecPanel, get recording() { return !!rec; }, LIVE,
-  get recInfo() { return rec ? { end: rec.end, state: rec.mr.state, T } : null; }, get recCanvas() { return rec ? rec.g.canvas : null; } };
+  get recInfo() { return rec ? { end: rec.end, state: rec.mr.state, T } : null; }, get recCanvas() { return rec ? rec.g.canvas : null; },
+  season: SPOOKY ? 'halloween' : '', HW, deletionsBetween };
 if (/(^|&)selftest=1/.test(location.hash.slice(1))) import('./selftest.js').then(m => m.run(window.__lapse));

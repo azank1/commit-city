@@ -3,7 +3,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script>document.documentElement.classList.add('js')</script>
+<script>(function (d) {
+  d.classList.add('js');
+  // Halloween: GitHub's Halloween colours on 31 October, by the visitor's own date (the rules of viewer/src/season.js)
+  try {
+    var q = new URLSearchParams(location.search + '&' + location.hash.slice(1)), a = q.get('theme'), n = new Date(), off = null;
+    try { off = localStorage.getItem('cc.season'); } catch (e) { /* storage off */ }
+    if (a === 'halloween' || (a !== 'plain' && n.getMonth() === 9 && n.getDate() === 31 && off !== 'plain-' + n.getFullYear())) d.dataset.season = 'halloween';
+  } catch (e) { /* an old browser: no season */ }
+})(document.documentElement)</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Explore cities · commit.city</title>
 <meta name="description" content="Browse every city built on commit.city: people, organisations and repositories, replayed from their git history as 3D city time-lapses. Filter by type, sort by size or by how much of it AI agents wrote.">
@@ -25,7 +33,7 @@
 <meta name="twitter:description" content="Browse every city built on commit.city: people, organisations and repositories, replayed from their git history as 3D city time-lapses. Filter by type, sort by size or by how much of it AI agents wrote.">
 <meta name="twitter:image" content="https://commit.city/api/og?page=explore">
 <link rel="preload" href="/s/f/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/s/site.css?v=92373990">
+<link rel="stylesheet" href="/s/site.css?v=361ff918">
 <style>
 .bar { position: sticky; top: calc(var(--nav-h) + env(safe-area-inset-top, 0px)); z-index: 10; padding: 14px 0; background: rgba(4, 6, 12, 0.82); backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
@@ -44,9 +52,10 @@
 .cta form.omni { width: 100%; }
 @media (max-width: 860px) { .cta { grid-template-columns: minmax(0, 1fr); } .bar .count { display: none; } }
 </style>
-<script src="/s/site.js?v=0cf12122" defer></script>
+<script src="/s/site.js?v=2bc55b82" defer></script>
 </head>
 <body>
+<div class="season-bar" role="note"><div class="wrap"><span class="pk" aria-hidden="true">🎃</span><span><b>Happy Halloween.</b> GitHub's contribution graph is orange today, and so is every city here.<span class="sb-more"> Deleted files rise as ghosts, and the AI agents are the ghostwriters.</span></span><button type="button" data-season-off>Turn it off</button></div></div>
 <header class="nav">
   <div class="wrap">
     <a class="brand" href="/" aria-label="commit.city home"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="#7fb3f0" d="M9.5 13.75L14 16L9.5 18.25L5 16Z"/><path fill="#1f4f8f" d="M5 16L9.5 18.25L9.5 25.25L5 23Z"/><path fill="#2d6cbd" d="M9.5 18.25L14 16L14 23L9.5 25.25Z"/><path fill="#f0a07a" d="M22.5 11.25L27 13.5L22.5 15.75L18 13.5Z"/><path fill="#8a3414" d="M18 13.5L22.5 15.75L22.5 25.25L18 23Z"/><path fill="#b5461c" d="M22.5 15.75L27 13.5L27 23L22.5 25.25Z"/><path fill="#b8f3ff" d="M16 7.25L20.5 9.5L16 11.75L11.5 9.5Z"/><path fill="#1f7f9c" d="M11.5 9.5L16 11.75L16 28.75L11.5 26.5Z"/><path fill="#3fb6d6" d="M16 11.75L20.5 9.5L20.5 26.5L16 28.75Z"/></svg><span>commit<b>.city</b></span></a>

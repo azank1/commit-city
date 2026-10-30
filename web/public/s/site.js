@@ -200,6 +200,11 @@
     $$('.rv').forEach(el => io.observe(el));
   } else $$('.rv').forEach(el => el.classList.add('in'));
   $$('form[data-omni]').forEach(omnibox);
+  // Halloween's "Turn it off": off in this browser until next year (viewer/src/season.js reads the same key)
+  $$('[data-season-off]').forEach(b => b.addEventListener('click', () => {
+    try { localStorage.setItem('cc.season', `plain-${new Date().getFullYear()}`); } catch { /* storage off: this page only */ }
+    delete document.documentElement.dataset.season;
+  }));
   if (/[?&]signin=/.test(location.search)) history.replaceState(null, '', location.pathname);
 
   /** A gallery tile for a built city. */

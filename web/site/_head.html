@@ -1,5 +1,13 @@
 <meta charset="utf-8">
-<script>document.documentElement.classList.add('js')</script>
+<script>(function (d) {
+  d.classList.add('js');
+  // Halloween: GitHub's Halloween colours on 31 October, by the visitor's own date (the rules of viewer/src/season.js)
+  try {
+    var q = new URLSearchParams(location.search + '&' + location.hash.slice(1)), a = q.get('theme'), n = new Date(), off = null;
+    try { off = localStorage.getItem('cc.season'); } catch (e) { /* storage off */ }
+    if (a === 'halloween' || (a !== 'plain' && n.getMonth() === 9 && n.getDate() === 31 && off !== 'plain-' + n.getFullYear())) d.dataset.season = 'halloween';
+  } catch (e) { /* an old browser: no season */ }
+})(document.documentElement)</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{title}}</title>
 <meta name="description" content="{{description}}">

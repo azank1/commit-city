@@ -206,6 +206,7 @@ The viewer is plain three.js in `viewer/src`:
 - `shaders.js` draws the crisp edges, the glow and the beams;
 - `main.js` runs the simulation, HUD, agent lens, recorder and controls;
 - `selftest.js` holds the interaction checks (open any city with `#selftest=1`);
+- `season.js` is the Halloween look: on 31 October (the visitor's own date) GitHub's Halloween graph colours, a moon, bats, and a ghost for every file deleted. `#theme=halloween` shows it any day, `#theme=plain` turns it off;
 - `live.js` and `live-selftest.js` are commit.city/events (`/events#selftest=1`, or `#demo=1` for a synthetic feed).
 
 The site's pages are written in `web/site/` (shared head, nav and footer partials, one file per page) and generated into `web/public/` by `web/scripts/site.mjs`. CI fails if a generated file is out of date.

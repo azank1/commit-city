@@ -16,7 +16,7 @@
 .tryrow .chips { display: contents; }
 .tryrow > span:first-child { margin-right: 2px; }
 .stagebox { position: relative; }
-.stage { position: relative; aspect-ratio: 16 / 11; border-radius: 22px; overflow: hidden; border: 1px solid rgba(95, 211, 243, 0.22);
+.stage { position: relative; aspect-ratio: 16 / 11; border-radius: 22px; overflow: hidden; border: 1px solid rgba(var(--accent-rgb), 0.22);
   background: radial-gradient(90% 70% at 50% 100%, rgba(44, 143, 214, 0.18), transparent 70%), #04060c center / contain no-repeat;
   box-shadow: 0 40px 140px rgba(20, 90, 160, 0.32), 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 .stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 0.9s; }
@@ -24,7 +24,7 @@
 .stage iframe.on { opacity: 1; }
 .stage .shield { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; width: 100%; cursor: pointer; }
 .stage .shield span { display: inline-flex; align-items: center; gap: 10px; padding: 7px 16px 7px 7px; border-radius: 99px; background: rgba(4, 6, 12, 0.74);
-  border: 1px solid rgba(95, 211, 243, 0.35); color: var(--ink); font-size: 14px; font-weight: 600; backdrop-filter: blur(8px); transition: 0.2s; }
+  border: 1px solid rgba(var(--accent-rgb), 0.35); color: var(--ink); font-size: 14px; font-weight: 600; backdrop-filter: blur(8px); transition: 0.2s; }
 .stage .shield i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-style: normal; font-size: 12px; }
 .stage .shield:hover span, .stage .shield:focus-visible span { border-color: var(--accent); transform: scale(1.04); }
 .stage .shield.busy { cursor: progress; place-items: end center; padding-bottom: 18px; }
@@ -32,7 +32,7 @@
 .stage .shield.busy i { display: none; }
 .stage .cap { position: absolute; left: 14px; top: 14px; z-index: 3; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 9px; border-radius: 99px;
   background: rgba(4, 6, 12, 0.72); border: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); backdrop-filter: blur(8px); font-family: var(--mono); }
-.stage .cap:hover { color: var(--ink); text-decoration: none; border-color: rgba(95, 211, 243, 0.4); }
+.stage .cap:hover { color: var(--ink); text-decoration: none; border-color: rgba(var(--accent-rgb), 0.4); }
 .stage .cap i { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); }
 .stage .open { position: absolute; right: 14px; top: 14px; z-index: 3; }
 .stage .open .btn { background: rgba(4, 6, 12, 0.72); backdrop-filter: blur(8px); }
@@ -42,7 +42,7 @@
 .tabs button img { width: 26px; height: 26px; border-radius: 50%; background: var(--bg-3); }
 .tabs button small { color: var(--muted); font-size: 11.5px; }
 .tabs button:hover { color: var(--ink); border-color: var(--line-2); }
-.tabs button[aria-selected="true"] { color: var(--ink); border-color: rgba(95, 211, 243, 0.5); background: var(--accent-soft); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-color: rgba(var(--accent-rgb), 0.5); background: var(--accent-soft); }
 @media (max-width: 980px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); } .hero .lede { max-width: none; } }
 
 @keyframes blink { 50% { opacity: 0; } }
@@ -148,10 +148,11 @@
 <main>
 <section class="hero">
   <div class="backdrop"></div>
+  <div class="bats" aria-hidden="true"><svg viewBox="0 0 34 20"><path d="M17 5L15.5 3 15 6C12 3.5 6 2.5 1 5c2.5 1 3.5 3 3.5 6 2-1.5 4.5-1.5 6 .5 1.5-1 3.5-1 4.5 1L17 14l2-1.5c1-2 3-2 4.5-1 1.5-2 4-2 6-.5 0-3 1-5 3.5-6-5-2.5-11-1.5-14 1l-.5-3z"/></svg><svg viewBox="0 0 34 20"><path d="M17 5L15.5 3 15 6C12 3.5 6 2.5 1 5c2.5 1 3.5 3 3.5 6 2-1.5 4.5-1.5 6 .5 1.5-1 3.5-1 4.5 1L17 14l2-1.5c1-2 3-2 4.5-1 1.5-2 4-2 6-.5 0-3 1-5 3.5-6-5-2.5-11-1.5-14 1l-.5-3z"/></svg><svg viewBox="0 0 34 20"><path d="M17 5L15.5 3 15 6C12 3.5 6 2.5 1 5c2.5 1 3.5 3 3.5 6 2-1.5 4.5-1.5 6 .5 1.5-1 3.5-1 4.5 1L17 14l2-1.5c1-2 3-2 4.5-1 1.5-2 4-2 6-.5 0-3 1-5 3.5-6-5-2.5-11-1.5-14 1l-.5-3z"/></svg></div>
   <div class="wrap">
     <div>
-      <a class="pill rv" href="#live"><i>new</i>The agent lens: see what AI wrote, commit by commit →</a>
-      <h1 class="h1 rv d1">Your GitHub,<br>as a <span class="grad">living city</span>.</h1>
+      <a class="pill rv" href="#live"><i>new</i><span><span class="s-off">The agent lens</span><span class="s-on">The ghostwriter lens</span>: see what AI wrote, commit by commit →</span></a>
+      <h1 class="h1 rv d1">Your GitHub,<br>as a <span class="grad s-off">living city</span><span class="grad s-on">haunted city</span>.</h1>
       <p class="lede rv d2">Swap <code>github.com</code> for <code>commit.city</code> on any profile, org or repo. A year of git history replays as a 3D city:
         <b>every file a tower, every commit a beam of light</b>, every bot and AI agent accounted for.</p>
       <form class="omni rv d3" data-omni role="search" autocomplete="off">
@@ -281,6 +282,7 @@
         <span class="kick">Reading a city</span>
         <h2 class="h2">Real history, drawn to scale.</h2>
         <p>commit.city doesn't estimate from contribution counts. It replays git itself, so a tower is exactly as tall as that file was on that day.</p>
+        <p class="s-on">Today the cities wear GitHub's Halloween colours, so their file-type colours differ from the ones below; each city's legend says which is which.</p>
       </div>
       <ul class="keys rv d1" id="keys"></ul>
       <div class="langs rv d2" id="langs"></div>
@@ -384,7 +386,7 @@ function mount(s) {
   const old = stage.querySelectorAll('iframe');
   const f = document.createElement('iframe');
   f.title = `${s.t} as a commit city`;
-  f.src = `/${s.t}#embed=1&hud=0&speed=1d&t=${since}`;
+  f.src = `/${s.t}#embed=1&hud=0&speed=1d&t=${since}${document.documentElement.dataset.season === 'halloween' ? '&theme=halloween' : ''}`;
   f.addEventListener('load', () => setTimeout(() => {
     if (STAGE[cur].t !== s.t) return f.remove();
     f.classList.add('on'); poster.style.opacity = 0; shield.hidden = true;
