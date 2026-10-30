@@ -205,6 +205,15 @@ body.embed .embed-link { display: inline-flex; }
 .repo-label[data-status="abandoned"] .ct, .repo-label[data-status="dormant"] .ct { color: var(--muted); }
 .repo-label.bump .ct { animation: bump 0.45s ease-out; }
 @keyframes bump { 30% { color: #fff; text-shadow: 0 0 10px var(--accent); } }
+/* Halloween (season.js): GitHub's Halloween graph colours; activity status takes its levels, hottest brightest */
+body.spooky { --accent: #fa7a18; --hot: #fddf68; --active: #fa7a18; --cooling: #bd561d; --dormant: #631c03; background: #05020a; }
+body.spooky .row.sel { background: rgba(250, 122, 24, 0.13); }
+body.spooky .seg.on { background: rgba(250, 122, 24, 0.2); }
+body.spooky #f-tops i { background: rgba(250, 122, 24, 0.5); }
+body.spooky .row .bar span { background: #bd561d; }
+body.spooky .tools button.on, body.spooky .toast.new, body.spooky .embed-link:hover { border-color: rgba(250, 122, 24, 0.42); }
+body.spooky #btn-play, body.spooky .rec-actions .pri { color: #1a0a00; }
+body.spooky .me-label { color: #fff1dc; text-shadow: 0 0 12px rgba(250, 122, 24, 0.9); }
 .me-label { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #dff7ff; text-shadow: 0 0 12px rgba(95, 211, 243, 0.9); pointer-events: none; }
 .dir-label { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #d7e6f7; background: rgba(6, 10, 18, 0.55); padding: 1px 6px; border-radius: 5px; border-left: 2px solid var(--accent); pointer-events: none; white-space: nowrap; }
 .sector-label { color: rgba(170, 195, 230, 0.55); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
@@ -298,6 +307,7 @@ body.embed .embed-link { display: inline-flex; }
     <div id="speeds" class="segs" role="group" aria-label="Speed"></div>
     <canvas id="timeline" aria-label="Timeline of your daily commits; drag to scrub"></canvas>
     <div class="tools">
+      <button id="btn-season" hidden>🎃</button>
       <button id="btn-lens" class="lens" title="Agent lens: colour commits by human, bot or AI agent (A)">agents</button>
       <button id="btn-rec" class="rec" title="Record a clip (R)"><i></i>rec</button>
       <button id="btn-orbit" title="Auto-orbit (O)">orbit</button>

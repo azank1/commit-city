@@ -3,7 +3,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script>document.documentElement.classList.add('js')</script>
+<script>(function (d) {
+  d.classList.add('js');
+  // Halloween: GitHub's Halloween colours on 31 October, by the visitor's own date (the rules of viewer/src/season.js)
+  try {
+    var q = new URLSearchParams(location.search + '&' + location.hash.slice(1)), a = q.get('theme'), n = new Date(), off = null;
+    try { off = localStorage.getItem('cc.season'); } catch (e) { /* storage off */ }
+    if (a === 'halloween' || (a !== 'plain' && n.getMonth() === 9 && n.getDate() === 31 && off !== 'plain-' + n.getFullYear())) d.dataset.season = 'halloween';
+  } catch (e) { /* an old browser: no season */ }
+})(document.documentElement)</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>How commit.city works</title>
 <meta name="description" content="How commit.city turns GitHub history into a 3D city: URLs, reading a city, the agent lens, the live view, sharing, privacy and opt-out, limits, self-hosting for private repos, and the API.">
@@ -25,13 +33,13 @@
 <meta name="twitter:description" content="How commit.city turns GitHub history into a 3D city: URLs, reading a city, the agent lens, the live view, sharing, privacy and opt-out, limits, self-hosting for private repos, and the API.">
 <meta name="twitter:image" content="https://commit.city/api/og?page=about">
 <link rel="preload" href="/s/f/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/s/site.css?v=92373990">
+<link rel="stylesheet" href="/s/site.css?v=361ff918">
 <style>
 .docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; padding: 8px 0 100px; }
 .toc { position: sticky; top: calc(var(--nav-h) + 24px); align-self: start; display: grid; gap: 2px; font-size: 14px; }
 .toc a { color: var(--muted); padding: 5px 10px; border-radius: 8px; border-left: 2px solid transparent; }
 .toc a:hover { color: var(--ink); text-decoration: none; background: rgba(255, 255, 255, 0.03); }
-.toc a.on { color: var(--ink); border-left-color: var(--accent); background: rgba(95, 211, 243, 0.06); }
+.toc a.on { color: var(--ink); border-left-color: var(--accent); background: rgba(var(--accent-rgb), 0.06); }
 .prose { max-width: 780px; }
 .prose section { padding-top: 12px; margin-bottom: 56px; }
 .prose h2 { font-size: 28px; letter-spacing: -0.025em; font-weight: 740; margin-bottom: 14px; }
@@ -47,7 +55,7 @@
 .prose td { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
 .prose td:first-child { color: var(--ink); white-space: nowrap; }
 .tablewrap { overflow-x: auto; }
-.callout { border: 1px solid rgba(95, 211, 243, 0.25); background: rgba(95, 211, 243, 0.05); border-radius: 14px; padding: 16px 18px; margin: 18px 0; color: var(--ink-2); font-size: 14.5px; }
+.callout { border: 1px solid rgba(var(--accent-rgb), 0.25); background: rgba(var(--accent-rgb), 0.05); border-radius: 14px; padding: 16px 18px; margin: 18px 0; color: var(--ink-2); font-size: 14.5px; }
 .callout.agent { border-color: rgba(197, 139, 255, 0.3); background: rgba(197, 139, 255, 0.05); }
 .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 16px 0; }
 .agents-grid div { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-1); }
@@ -62,9 +70,10 @@
 @media (max-width: 960px) { .docs { grid-template-columns: minmax(0, 1fr); } .toc { display: none; } }
 @media (max-width: 640px) { .flow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .flow div::after { display: none; } }
 </style>
-<script src="/s/site.js?v=0cf12122" defer></script>
+<script src="/s/site.js?v=2bc55b82" defer></script>
 </head>
 <body>
+<div class="season-bar" role="note"><div class="wrap"><span class="pk" aria-hidden="true">🎃</span><span><b>Happy Halloween.</b> GitHub's contribution graph is orange today, and so is every city here.<span class="sb-more"> Deleted files rise as ghosts, and the AI agents are the ghostwriters.</span></span><button type="button" data-season-off>Turn it off</button></div></div>
 <header class="nav">
   <div class="wrap">
     <a class="brand" href="/" aria-label="commit.city home"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="#7fb3f0" d="M9.5 13.75L14 16L9.5 18.25L5 16Z"/><path fill="#1f4f8f" d="M5 16L9.5 18.25L9.5 25.25L5 23Z"/><path fill="#2d6cbd" d="M9.5 18.25L14 16L14 23L9.5 25.25Z"/><path fill="#f0a07a" d="M22.5 11.25L27 13.5L22.5 15.75L18 13.5Z"/><path fill="#8a3414" d="M18 13.5L22.5 15.75L22.5 25.25L18 23Z"/><path fill="#b5461c" d="M22.5 15.75L27 13.5L27 23L22.5 25.25Z"/><path fill="#b8f3ff" d="M16 7.25L20.5 9.5L16 11.75L11.5 9.5Z"/><path fill="#1f7f9c" d="M11.5 9.5L16 11.75L16 28.75L11.5 26.5Z"/><path fill="#3fb6d6" d="M16 11.75L20.5 9.5L20.5 26.5L16 28.75Z"/></svg><span>commit<b>.city</b></span></a>
@@ -241,6 +250,7 @@ GH_TOKEN=... commit-city build --login YOU --include-private  <span class="c"># 
         <tr><td><code>focus=owner/repo</code></td><td>start focused on a repo</td></tr>
         <tr><td><code>lens=agents</code></td><td>start with the agent lens on</td></tr>
         <tr><td><code>embed=1</code></td><td>embedded mode: no site bar, scroll doesn't zoom until clicked</td></tr>
+        <tr><td><code>theme=halloween</code> · <code>theme=plain</code></td><td>GitHub's Halloween colours, a moon, bats and a ghost for each deleted file, or none. Without it, the look comes on by itself on 31 October (your own date), except in an embed</td></tr>
       </table></div>
       <p>The payload format is versioned and documented: <a href="https://github.com/azank1/commit-city/blob/main/schema/lapse.schema.json">schema/lapse.schema.json</a>.</p>
     </section>

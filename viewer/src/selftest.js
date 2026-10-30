@@ -105,6 +105,19 @@ export async function run(L) {
     L.setLens(false, true);
     if (snap) { const im = new Image(); im.src = snap; im.id = 'selftest-clip'; im.style.cssText = 'position:fixed;right:16px;top:16px;z-index:99;height:calc(100vh - 32px);border-radius:8px;box-shadow:0 0 0 1px #fff3'; document.body.appendChild(im); }
   } else check('recording skipped: no MediaRecorder in this browser', true);
+  if (L.season === 'halloween') {
+    // the moon is in the opening view, the bats fly, and a replay that deletes files raises ghosts
+    document.getElementById('btn-home').click(); L.step(2.5);
+    const m = L.HW.moon.position.clone().project(L.camera);
+    check('halloween: the moon is in the opening view', Math.abs(m.x) < 0.9 && m.y > 0 && m.y < 0.95 && m.z < 1, `ndc ${m.x.toFixed(2)}, ${m.y.toFixed(2)}`);
+    const b0 = L.HW.bats[0].s.position.clone(); L.step(0.5);
+    check('halloween: the bats fly', L.HW.bats[0].s.position.distanceTo(b0) > 0.01);
+    const g0 = L.HW.ghostsRaised, t0 = L.T_END * 0.2;
+    L.seek(t0); key('6'); key(' '); L.step(4); key(' ');
+    const dels = L.deletionsBetween(t0, L.T), raised = L.HW.ghostsRaised - g0;
+    check('halloween: deleted files raise ghosts', dels ? raised > 0 && raised <= dels : raised === 0, `${dels} files deleted, ${raised} ghosts`);
+    key('3');
+  }
   check('no uncaught page errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   const pre = document.createElement('pre');
   pre.id = 'selftest';

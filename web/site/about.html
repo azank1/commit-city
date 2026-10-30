@@ -10,7 +10,7 @@
 .toc { position: sticky; top: calc(var(--nav-h) + 24px); align-self: start; display: grid; gap: 2px; font-size: 14px; }
 .toc a { color: var(--muted); padding: 5px 10px; border-radius: 8px; border-left: 2px solid transparent; }
 .toc a:hover { color: var(--ink); text-decoration: none; background: rgba(255, 255, 255, 0.03); }
-.toc a.on { color: var(--ink); border-left-color: var(--accent); background: rgba(95, 211, 243, 0.06); }
+.toc a.on { color: var(--ink); border-left-color: var(--accent); background: rgba(var(--accent-rgb), 0.06); }
 .prose { max-width: 780px; }
 .prose section { padding-top: 12px; margin-bottom: 56px; }
 .prose h2 { font-size: 28px; letter-spacing: -0.025em; font-weight: 740; margin-bottom: 14px; }
@@ -26,7 +26,7 @@
 .prose td { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
 .prose td:first-child { color: var(--ink); white-space: nowrap; }
 .tablewrap { overflow-x: auto; }
-.callout { border: 1px solid rgba(95, 211, 243, 0.25); background: rgba(95, 211, 243, 0.05); border-radius: 14px; padding: 16px 18px; margin: 18px 0; color: var(--ink-2); font-size: 14.5px; }
+.callout { border: 1px solid rgba(var(--accent-rgb), 0.25); background: rgba(var(--accent-rgb), 0.05); border-radius: 14px; padding: 16px 18px; margin: 18px 0; color: var(--ink-2); font-size: 14.5px; }
 .callout.agent { border-color: rgba(197, 139, 255, 0.3); background: rgba(197, 139, 255, 0.05); }
 .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 16px 0; }
 .agents-grid div { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-1); }
@@ -201,6 +201,7 @@ GH_TOKEN=... commit-city build --login YOU --include-private  <span class="c"># 
         <tr><td><code>focus=owner/repo</code></td><td>start focused on a repo</td></tr>
         <tr><td><code>lens=agents</code></td><td>start with the agent lens on</td></tr>
         <tr><td><code>embed=1</code></td><td>embedded mode: no site bar, scroll doesn't zoom until clicked</td></tr>
+        <tr><td><code>theme=halloween</code> · <code>theme=plain</code></td><td>GitHub's Halloween colours, a moon, bats and a ghost for each deleted file, or none. Without it, the look comes on by itself on 31 October (your own date), except in an embed</td></tr>
       </table></div>
       <p>The payload format is versioned and documented: <a href="https://github.com/azank1/commit-city/blob/main/schema/lapse.schema.json">schema/lapse.schema.json</a>.</p>
     </section>
